@@ -179,13 +179,46 @@
     </main>
 
     <script>
-      function debounce(fn, delay) {
-  let timer;
-  return function (...args) {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), delay);
+   // --- Utilities & UI helpers (load these first) ---
+if (!window.debounce) {
+  window.debounce = function (fn, delay) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
   };
 }
+
+if (!window.setUploadStatus) {
+  window.setUploadStatus = function (text) {
+    const el = document.getElementById('uploadStatus');
+    if (el) el.textContent = text;
+  };
+}
+
+if (!window.updateLastUpload) {
+  window.updateLastUpload = function (d) {
+    const el = document.getElementById('lastUpload');
+    if (!el) return;
+    const ts = d instanceof Date && !isNaN(d) ? d.toLocaleString('en-ZA', {
+      year: 'numeric', month: 'short', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }) : '–';
+    el.textContent = `Last update: ${ts}`;
+  };
+}
+
+if (!window.formatDate) {
+  window.formatDate = function (d) {
+    if (!(d instanceof Date) || isNaN(d)) return '';
+    return d.toLocaleString('en-ZA', {
+      year: 'numeric', month: 'short', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  };
+}
+
 
      /***************
  * CONFIG
@@ -403,3 +436,4 @@ function loadReceiving() {
   </body>
 
 </html>
+
