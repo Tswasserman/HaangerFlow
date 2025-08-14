@@ -968,24 +968,35 @@ function buildDispatchChips() {
 }
 
 function recomputeDispatch() {
-  let groups = groupByOrder(STATE.dispatch.raw);
-
-  // inline filter to use _normColour
   const search = (STATE.dispatch.filters.search || '').toLowerCase();
   const colour = STATE.dispatch.filters.colour;
 
-  groups = groups.filter(g => {
-    const text = g.rows.map(r =>
-      `${r['Order Number']} ${r['Item ID']} ${r['Colour']} ${r['Status']} ${r['User']}`
-    ).join(' ').toLowerCase();
-    const matchesSearch = !search || text.includes(search);
-    const matchesColour = (colour === null) || g.rows.some(r => r._normColour === colour);
-    return matchesSearch && matchesColour;
-  });
+  // --- CASE 1: Search active -> group by Order Number ---
+  if (search) {
+    let rows = STATE.dispatch.raw;
+    // Filter rows to the search term
+    rows = rows.filter(r =>
+      String(r['Order Number'] || '').toLowerCase().includes(search)
+    );
+    // Still allow colour filter on top if active
+    if (colour !== null) rows = rows.filter(r => r._normColour === colour);
 
-  STATE.dispatch.filteredGroups = groups;
-  STATE.dispatch.pages = paginateGroups(groups, STATE.dispatch.pageSize);
-  renderDispatch();
+    const groups = groupByOrder(rows);
+    STATE.dispatch.filteredGroups = groups;
+    STATE.dispatch.pages = paginateGroups(groups, STATE.dispatch.pageSize);
+    STATE.dispatch.pageIndex = Math.min(STATE.dispatch.pageIndex, STATE.dispatch.pages.length - 1);
+    renderDispatchGrouped();
+    return;
+  }
+
+  // --- CASE 2: No search -> flat list filter by colour only ---
+  let out = STATE.dispatch.raw;
+  if (colour !== null) out = out.filter(r => r._normColour === colour);
+
+  STATE.dispatch.filteredRows = out;
+  STATE.dispatch.totalPages = Math.ceil(out.length / STATE.dispatch.pageSize);
+  STATE.dispatch.pageIndex = Math.min(STATE.dispatch.pageIndex, STATE.dispatch.totalPages - 1);
+  renderDispatchFlat();
 }
 
 function renderDispatch() {
@@ -1270,6 +1281,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
