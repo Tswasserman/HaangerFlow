@@ -845,68 +845,7 @@ function renderStock() {
   updateStockTotals();
 }
 
-// ---------- PAGER LABEL + BUTTONS ----------
-function updateStockPager() {
-  const label = document.getElementById('stockPagerLabel'); // shows "X / Y"
-  const prevBtn = document.getElementById('stockPrevBtn');
-  const nextBtn = document.getElementById('stockNextBtn');
-
-  const p = STATE.stock.page;
-  const t = STATE.stock.totalPages;
-
-  if (label) {
-    if (t === 0) label.textContent = '0 / 0';
-    else label.textContent = `${p} / ${t}`;
-  }
-  if (prevBtn) prevBtn.disabled = (t === 0 || p <= 1);
-  if (nextBtn) nextBtn.disabled = (t === 0 || p >= t);
-}
-
-function goToStockPage(n) {
-  if (STATE.stock.totalPages === 0) {
-    STATE.stock.page = 0;
-  } else {
-    STATE.stock.page = Math.max(1, Math.min(n, STATE.stock.totalPages));
-  }
-  renderStock();
-}
-
-function toggleStockSort(col) {
-  if (STATE.stock.sortKey === col) {
-    STATE.stock.sortDir = STATE.stock.sortDir === 'asc' ? 'desc' : 'asc';
-  } else {
-    STATE.stock.sortKey = col;
-    STATE.stock.sortDir = 'asc';
-  }
-  // keep current page but clamp after resort
-  computeStockDerived();
-  renderStock();
-}
-
-// ---------- TOTALS ----------
-function updateStockTotals() {
-  const itemsEl   = document.getElementById('stockTotalItems');
-  const qtyEl     = document.getElementById('stockTotalQty');
-  const cartonsEl = document.getElementById('stockTotalCartons');
-
-  // work from the already‑filtered list (grand totals, not page-only)
-  const rows = STATE.stock.filtered;
-
-  const totalItems   = rows.length;
-  const totalQty     = rows.reduce((sum, r) => {
-    const n = numOrNaN(r['Total QTY']);
-    return sum + (Number.isNaN(n) ? 0 : n);
-  }, 0);
-  const totalCartons = rows.reduce((sum, r) => {
-    const n = numOrNaN(r['Total Cartons']);
-    return sum + (Number.isNaN(n) ? 0 : n);
-  }, 0);
-
-if (itemsEl)   itemsEl.textContent   = totalItems.toLocaleString('en-ZA');
-if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
-if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
-}  
-//**************
+/**************
  * DISPATCHED
  ***************/
 
@@ -1281,6 +1220,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
