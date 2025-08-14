@@ -266,6 +266,7 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
     <button class="nav-btn active" data-route="stock">Stock</button>
     <button class="nav-btn" data-route="dispatch">Dispatched Orders</button>
     <button class="nav-btn" data-route="receiving">Receiving Stock</button>
+    <button class="nav-btn" data-route="receiving">Recycled Stock</button>
   </div>
 
   <!-- Center: HangerFlow logo -->
@@ -366,7 +367,7 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
         </div>
       </section>
 
-      <!-- Receiving Page -->
+
       <!-- Receiving Page -->
 <section id="page-receiving" class="page">
   <div class="card">
@@ -400,6 +401,19 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
           <option>25</option><option selected>50</option><option>100</option><option>200</option>
         </select>
       </div>
+    </div>
+  </div>
+</section>
+      <!-- Recycled Stock Page -->
+<section id="page-recycled" class="page">
+  <div class="card">
+    <div class="toolbar">
+      <h2>Recycled Stock</h2>
+    </div>
+
+    <div class="placeholder" style="padding: 3rem; text-align: center; color: #777;">
+      <h3>♻️ Coming Soon</h3>
+      <p>This section will display recycled stock data once it’s ready to go live.</p>
     </div>
   </div>
 </section>
@@ -518,7 +532,14 @@ const STATE = {
     pageIndex: 0, pageSize: 50, filters: { search: '', colour: null }
   },
   receiving: {
-    data: [], page: 1, pageSize: 50
+  raw: [],              // unfiltered data
+  filteredGroups: [],   // after search/colour filters
+  pages: [],            // paginated groups
+  pageIndex: 0,
+  pageSize: 50,
+  filters: {
+    search: '',
+    colour: null        // null = All
   }
 };
 
@@ -1001,22 +1022,25 @@ function updateDispatchTotals() {
   if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }
 
-/***************
- * RECEIVING
- ***************/
 /**************
  * RECEIVING
  ***************/
 function setupReceivingUI() {
-  document.getElementById('receivingSearch').addEventListener('input', debounce(() => {
-    STATE.receiving.filters.search = document.getElementById('receivingSearch').value.trim().toLowerCase();
-    STATE.receiving.pageIndex = 0;
-    recomputeReceiving();
-  }, 120));
+  const searchEl = document.getElementById('receivingSearch');
+  const prevBtn  = document.getElementById('receivingPrev');
+  const nextBtn  = document.getElementById('receivingNext');
+  const sizeSel  = document.getElementById('receivingPageSize');
 
-  document.getElementById('receivingPrev').addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex - 1));
-  document.getElementById('receivingNext').addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex + 1));
-  document.getElementById('receivingPageSize').addEventListener('change', e => {
+  if (searchEl) {
+    searchEl.addEventListener('input', debounce(() => {
+      STATE.receiving.filters.search = searchEl.value.trim().toLowerCase();
+      STATE.receiving.pageIndex = 0;
+      recomputeReceiving();
+    }, 120));
+  }
+  if (prevBtn) prevBtn.addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex - 1));
+  if (nextBtn) nextBtn.addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex + 1));
+  if (sizeSel) sizeSel.addEventListener('change', e => {
     const v = parseInt(e.target.value, 10);
     if (!Number.isNaN(v) && v > 0) {
       STATE.receiving.pageSize = v;
@@ -1030,11 +1054,15 @@ function loadReceiving() {
   fetch(`${API.baseUrl}?dataset=receiving`)
     .then(res => res.json())
     .then(payload => {
-      STATE.receiving.raw = (payload.rows||[]).map(r => {
+      STATE.receiving.raw = (payload.rows || []).map(r => {
         const iso = r.timestampIso || r['Timestamp'] || '';
         const d = new Date(iso);
         return {
           ...r,
+          // normalize numerics for reliable totals/sort later
+          'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
+          'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
+          'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
           _ts: isNaN(d) ? new Date(0) : d,
           _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
           _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`
@@ -1048,27 +1076,76 @@ function loadReceiving() {
 
 function buildReceivingChips() {
   const wrap = document.getElementById('receivingChips');
+  if (!wrap) return;
   wrap.innerHTML = '';
-  const colours = [...new Set(STATE.receiving.raw.map(r => r['Colour']).filter(Boolean))].sort();
-  wrap.appendChild(makeChip('All', !STATE.receiving.filters.colour, null, () => {
-    STATE.receiving.filters.colour = null;
-    STATE.receiving.pageIndex = 0;
-    recomputeReceiving();
-  }));
-  colours.forEach(c => {
-    wrap.appendChild(makeChip(c, STATE.receiving.filters.colour===c, c, () => {
-      STATE.receiving.filters.colour = c;
+
+  // ensure filters object exists
+  if (!STATE.receiving.filters) STATE.receiving.filters = { colour: null, search: '' };
+  const current = STATE.receiving.filters.colour; // normalized lowercase or null
+
+  const makeActiveChip = (label, value) => {
+    const isActive = current === value;
+    const chip = makeChip(label, isActive, value, () => {
+      STATE.receiving.filters.colour = value;
       STATE.receiving.pageIndex = 0;
       recomputeReceiving();
-    }));
+      buildReceivingChips(); // re-apply active state
+    });
+    if (isActive) chip.classList.add('active');
+    return chip;
+  };
+
+  // All
+  wrap.appendChild(makeActiveChip('All', null));
+
+  // colours (normalized to lowercase)
+  const colours = [...new Set(
+    STATE.receiving.raw.map(r => (r['Colour'] || '').toLowerCase().trim())
+  )].filter(Boolean).sort();
+
+  colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
+}
+
+function applyReceivingFilters(groups) {
+  const s = (STATE.receiving.filters.search || '').toLowerCase();
+  const c = STATE.receiving.filters.colour; // null or lowercase
+
+  let out = groups;
+
+  if (s) {
+    out = out.map(g => ({
+      key: g.key,
+      rows: g.rows.filter(r =>
+        String(r['Order Number']||'').toLowerCase().includes(s) ||
+        String(r['Item ID']||'').toLowerCase().includes(s) ||
+        String(r['Status']||'').toLowerCase().includes(s) ||
+        String(r['Colour']||'').toLowerCase().includes(s)
+      )
+    })).filter(g => g.rows.length);
+  }
+
+  if (c !== null) {
+    out = out.map(g => ({
+      key: g.key,
+      rows: g.rows.filter(r => (r['Colour']||'').toLowerCase().trim() === c)
+    })).filter(g => g.rows.length);
+  }
+
+  // sort groups by timestamp desc (most recent first), stable
+  out.sort((a,b) => {
+    const at = a.rows.length ? new Date(a.rows[0].timestampIso || a.rows[0]['Timestamp']).getTime() : 0;
+    const bt = b.rows.length ? new Date(b.rows[0].timestampIso || b.rows[0]['Timestamp']).getTime() : 0;
+    return bt - at;
   });
+
+  return out;
 }
 
 function recomputeReceiving() {
-  let groups = groupByOrder(STATE.receiving.raw);
-  groups = applyReceivingFilters(groups); // similar to dispatch filters
+  let groups = groupByOrder(STATE.receiving.raw);     // reuse your existing helper
+  groups = applyReceivingFilters(groups);
   STATE.receiving.filteredGroups = groups;
-  STATE.receiving.pages = paginateGroups(groups, STATE.receiving.pageSize);
+  STATE.receiving.pages = paginateGroups(groups, STATE.receiving.pageSize); // reuse your helper
   renderReceiving();
 }
 
@@ -1078,7 +1155,7 @@ function renderReceiving() {
   const page = STATE.receiving.pages[STATE.receiving.pageIndex] || { rows: [] };
 
   if (!page.rows.length) {
-    body.innerHTML='<tr><td colspan="9" class="muted">No rows</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="muted">No rows</td></tr>';
   } else {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
@@ -1098,7 +1175,7 @@ function renderReceiving() {
 
 function goReceivingPage(n) {
   const totalPages = STATE.receiving.pages.length;
-  STATE.receiving.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
+  STATE.receiving.pageIndex = Math.min(Math.max(n, 0), Math.max(totalPages - 1, 0));
   renderReceiving();
 }
 
@@ -1109,21 +1186,17 @@ function updateReceivingPager() {
   const rowInfo = document.getElementById('receivingRowInfo');
 
   const totalPages = STATE.receiving.pages.length;
-  const currentPage = STATE.receiving.pageIndex + 1;
+  const currentPage = totalPages ? (STATE.receiving.pageIndex + 1) : 0;
 
-  if (pageNumEl) {
-    if (totalPages === 0) pageNumEl.textContent = '0 / 0';
-    else pageNumEl.textContent = `${currentPage} / ${totalPages}`;
-  }
+  if (pageNumEl) pageNumEl.textContent = `${currentPage} / ${totalPages}`;
 
   if (prevBtn) prevBtn.disabled = (totalPages === 0 || currentPage <= 1);
   if (nextBtn) nextBtn.disabled = (totalPages === 0 || currentPage >= totalPages);
 
   const totalRows = STATE.receiving.filteredGroups.reduce((sum,g) => sum + g.rows.length, 0);
   if (rowInfo) {
-    if (totalRows === 0) {
-      rowInfo.textContent = '0–0 of 0';
-    } else {
+    if (totalRows === 0) rowInfo.textContent = '0–0 of 0';
+    else {
       const start = (STATE.receiving.pageIndex * STATE.receiving.pageSize) + 1;
       const end = Math.min(start + STATE.receiving.pageSize - 1, totalRows);
       rowInfo.textContent = `${start}–${end} of ${totalRows}`;
@@ -1132,17 +1205,18 @@ function updateReceivingPager() {
 }
 
 function updateReceivingTotals() {
-  const countEl = document.getElementById('receivingCount');
-  const qtyEl = document.getElementById('receivingQty');
+  const countEl   = document.getElementById('receivingCount');
+  const qtyEl     = document.getElementById('receivingQty');
   const cartonsEl = document.getElementById('receivingCartons');
 
+  const orders = STATE.receiving.filteredGroups.length;
   const allRows = STATE.receiving.filteredGroups.flatMap(g => g.rows);
-  const totalOrders = STATE.receiving.filteredGroups.length;
+
   const totalQty = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Qty']) || 0), 0);
   const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
 
-  if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
-  if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
+  if (countEl)   countEl.textContent   = orders.toLocaleString('en-ZA');
+  if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
   if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }
 
@@ -1156,6 +1230,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
