@@ -799,7 +799,32 @@ function computeStockDerived() {
     if (STATE.stock.page > pages) STATE.stock.page = pages;
   }
 }
+// ---------- PAGER HELPER ----------
+function updateStockPager() {
+  const lbl  = document.getElementById('stockPagerLabel');
+  const prev = document.getElementById('stockPrevBtn');
+  const next = document.getElementById('stockNextBtn');
+  const info = document.getElementById('rowInfo');
 
+  const totalPages = STATE.stock.totalPages || 0;
+  const current    = STATE.stock.page || 0;
+  const pageSize   = STATE.stock.pageSize;
+  const totalRows  = STATE.stock.filtered.length;
+
+  if (lbl) lbl.textContent = `${current} / ${totalPages}`;
+  if (prev) prev.disabled  = current <= 1;
+  if (next) next.disabled  = current >= totalPages || totalPages === 0;
+
+  if (info) {
+    if (!totalRows) {
+      info.textContent = '0–0 of 0';
+    } else {
+      const start = (current - 1) * pageSize + 1;
+      const end   = Math.min(start + pageSize - 1, totalRows);
+      info.textContent = `${start}–${end} of ${totalRows}`;
+    }
+  }
+}
 // ---------- RENDER ----------
 function renderStock() {
   // table
@@ -1220,6 +1245,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
