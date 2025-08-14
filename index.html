@@ -5,94 +5,282 @@
     <meta charset="utf-8">
     <title>HangerFlow</title>
     <style>
-      :root {
-        --bg: #0b0f14;
-        --panel: #121821;
-        --ink: #e8eef7;
-        --muted: #9fb0c3;
-        --accent: #3aa0ff;
-        --accent-2: #7bd389;
-        --danger: #ff6b6b;
-        --border: #1e2633;
-        --chip: #1a2431;
-        --table-row: #0e141b;
-        --table-row-alt: #121a23;
-      }
-      html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font:14px/1.4 Inter, Segoe UI, Roboto, Arial, sans-serif; }
-      .app-header {
-        display:flex; align-items:center; justify-content:space-between;
-        padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10;
-      }
-      .left-nav { display:flex; gap:8px; }
-      .nav-btn {
-        background:#0f1620; color:var(--ink); border:1px solid var(--border);
-        padding:8px 10px; border-radius:8px; cursor:pointer; transition:all .15s ease; font-weight:600;
-      }
-      .nav-btn.active, .nav-btn:hover { border-color:var(--accent); color:#fff; box-shadow:0 0 0 2px rgba(58,160,255,0.15) inset; }
-      .brand { display:flex; align-items:center; gap:12px; }
-      .brand-title { font-weight:800; letter-spacing:.5px; }
-      .spacer { flex:1; }
-      .logos { display:flex; align-items:center; gap:10px; }
-      .logos img { height:28px; width:auto; filter:brightness(0.95) contrast(1.05); }
+   :root {
+  --bg: #0b0f14;
+  --panel: #121821;
+  --ink: #e8eef7;
+  --muted: #9fb0c3;
+  --accent: #3aa0ff;
+  --accent-2: #7bd389;
+  --danger: #ff6b6b;
+  --border: #1e2633;
+  --chip: #1a2431;
+  --table-row: #0e141b;
+  --table-row-alt: #121a23;
+}
 
-      .page { display:none; padding:16px; }
-      .page.active { display:block; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.4 Inter, Segoe UI, Roboto, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh; /* ensures footer sticks to bottom */
+}
 
-      .card {
-        background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px;
-      }
+main {
+  flex: 1; /* pushes footer down when content is short */
+}
 
-      /* Stock toolbar */
-      .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
-      .search { position:relative; flex:1; min-width:240px; }
-      .search input {
-        width:100%; background:#0f1620; color:var(--ink); border:1px solid var(--border);
-        padding:10px 12px; border-radius:8px; outline:none;
-      }
-      .search input:focus { border-color:var(--accent); }
-      .chip {
-        background:var(--chip); border:1px solid var(--border); color:var(--muted);
-        padding:8px 10px; border-radius:999px; cursor:pointer; user-select:none;
-      }
-      .chip.active { color:#fff; border-color:var(--accent-2); box-shadow:0 0 0 2px rgba(123,211,137,0.15) inset; }
+/* Header base */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
 
-      /* Table */
-      .table-wrap { overflow:auto; max-height: calc(100vh - 180px); border:1px solid var(--border); border-radius:10px; }
-      table { width:100%; border-collapse:separate; border-spacing:0; }
-      thead th {
-        position:sticky; top:0; background:#0d141c; color:#cfe3ff; text-align:left; padding:10px; font-size:12px; border-bottom:1px solid var(--border); cursor:pointer;
-      }
-      tbody td { padding:10px; border-bottom:1px solid var(--border); white-space:nowrap; }
-      tbody tr:nth-child(odd) { background:var(--table-row); }
-      tbody tr:nth-child(even) { background:var(--table-row-alt); }
-      .kpi { display:flex; gap:12px; margin-bottom:10px; }
-      .kpi .pill { background:#0f1620; border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--muted); }
-      .pill strong { color:#fff; margin-left:6px; }
 
-      .footerbar { display:flex; justify-content:space-between; align-items:center; padding:10px 6px; color:var(--muted); }
-      .pager { display:flex; gap:8px; align-items:center; }
-      .pager button { padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:#0f1620; color:var(--ink); cursor:pointer; }
-      .sort-ind { margin-left:6px; color:var(--muted); font-size:12px; }
-      .muted { color:var(--muted); }
+.left-nav { display: flex; gap: 8px; }
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.brand-logo {
+  height: 45px;
+  width: auto;
+  filter: brightness(1.05) contrast(1.05);
+}
 
-      /* Page placeholders */
-      .placeholder { padding:40px; text-align:center; color:var(--muted); border:1px dashed var(--border); border-radius:10px; }
 
-      .upload-status { font-weight: bold; margin-top: 6px; color: #9fb0c3; }
-      .last-upload { font-size: 0.9em; color: #9fb0c3; }
+
+
+
+.spacer { flex: 1; }
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.header-logo img {
+  height: 28px;
+  width: auto;
+  filter: brightness(0.95) contrast(1.05);
+}
+
+.nav-btn {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.nav-btn:hover {
+  color: var(--ink);
+}
+.nav-btn.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+
+
+
+.header-logo img {
+  height: 28px;
+  width: auto;
+  filter: brightness(0.95) contrast(1.05);
+}
+
+.page { display: none; padding: 16px; }
+.page.active { display: block; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* Stock toolbar */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.search { position: relative; flex: 1; min-width: 240px; }
+.search input {
+  width: 100%;
+  background: #0f1620;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 8px;
+  outline: none;
+}
+.search input:focus { border-color: var(--accent); }
+
+.chip {
+  background: var(--chip);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+}
+.chip.active {
+  color: #fff;
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 2px rgba(123,211,137,0.15) inset;
+}
+
+/* Table */
+.table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: #0d141c;
+  color: #cfe3ff;
+  text-align: left;
+  padding: 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+tbody td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr:nth-child(odd) { background: var(--table-row); }
+tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+.kpi {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.kpi .pill {
+  background: #0f1620;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--muted);
+}
+.pill strong { color: #fff; margin-left: 6px; }
+
+.footerbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 6px;
+  color: var(--muted);
+}
+.pager { display: flex; gap: 8px; align-items: center; }
+.pager button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #0f1620;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sort-ind { margin-left: 6px; color: var(--muted); font-size: 12px; }
+.muted { color: var(--muted); }
+
+/* Page placeholders */
+.placeholder {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.upload-status { font-weight: bold; margin-top: 6px; color: var(--muted); }
+.last-upload { font-size: 0.9em; color: var(--muted); }
+
+/* Sticky footer styles */
+.app-footer {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Flex layout for content */
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+/* Left/right spans */
+.footer-content span {
+  white-space: nowrap;
+}
+
+/* On narrow screens, stack neatly */
+@media (max-width: 600px) {
+  .footer-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}
+
+
     </style>
-  </head>
-  <body>
-    <header class="app-header">
-      <div class="left-nav" id="leftNav">
-        <button class="nav-btn active" data-route="stock">Stock</button>
-        <button class="nav-btn" data-route="dispatch">Dispatched Orders</button>
-        <button class="nav-btn" data-route="receiving">Receiving Stock</button>
-      </div>
-      <div class="brand"><div class="brand-title">HangerFlow</div></div>
-      <div class="spacer"></div>
-      
-    </header>
+<header class="app-header">
+  <!-- Left navigation -->
+  <div class="left-nav" id="leftNav">
+    <button class="nav-btn active" data-route="stock">Stock</button>
+    <button class="nav-btn" data-route="dispatch">Dispatched Orders</button>
+    <button class="nav-btn" data-route="receiving">Receiving Stock</button>
+  </div>
+
+  <!-- Center: HangerFlow logo -->
+  <div class="brand">
+    <img src="https://drive.google.com/thumbnail?id=14aZ0hc9FRPCl_GI4ps1dtPnlyIarypaF&sz=w1000" 
+         alt="HangerFlow Logo" class="brand-logo">
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- Right: Premier Hangers logo + text -->
+  <div class="header-logo">
+    <img src="https://premierhangers.co.za/assets/images/image02.jpg?v=b8953020" 
+         alt="Premier Hangers Pty Ltd">
+  
+  </div>
+</header>
+
 
     <main>
       <!-- Stock Page -->
@@ -179,53 +367,22 @@
     </main>
 
     <script>
-   // --- Utilities & UI helpers (load these first) ---
-if (!window.debounce) {
-  window.debounce = function (fn, delay) {
-    let timer;
-    return function (...args) {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn.apply(this, args), delay);
-    };
+
+ function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
   };
 }
 
-if (!window.setUploadStatus) {
-  window.setUploadStatus = function (text) {
-    const el = document.getElementById('uploadStatus');
-    if (el) el.textContent = text;
-  };
+function setUploadStatus(text) {
+  document.getElementById('uploadStatus').textContent = text;
 }
 
-if (!window.updateLastUpload) {
-  window.updateLastUpload = function (d) {
-    const el = document.getElementById('lastUpload');
-    if (!el) return;
-    const ts = d instanceof Date && !isNaN(d) ? d.toLocaleString('en-ZA', {
-      year: 'numeric', month: 'short', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    }) : '–';
-    el.textContent = `Last update: ${ts}`;
-  };
+function formatDate(d) {
+  return d.toLocaleString(); // tweak if you want a specific format
 }
-
-if (!window.formatDate) {
-  window.formatDate = function (d) {
-    if (!(d instanceof Date) || isNaN(d)) return '';
-    return d.toLocaleString('en-ZA', {
-      year: 'numeric', month: 'short', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    });
-  };
-}
-function makeChip(label, isActive, value, onClick) {
-  const chip = document.createElement('button');
-  chip.className = 'chip' + (isActive ? ' active' : '');
-  chip.textContent = label;
-  chip.addEventListener('click', onClick);
-  return chip;
-}
-
 
      /***************
  * CONFIG
@@ -235,57 +392,6 @@ const API = {
   resource: 'stock',
   useJsonpFallback: true
 };
-function groupByOrder(rows) {
-  const map = {};
-  rows.forEach(r => {
-    const orderNum = String(r['Order Number'] || '').trim();
-    if (!map[orderNum]) {
-      map[orderNum] = { order: orderNum, rows: [] };
-    }
-    map[orderNum].rows.push(r);
-  });
-  return Object.values(map);
-}
-// Filter grouped orders by search text and colour
-function applyDispatchFilters(groups) {
-  const search = (STATE.dispatch.filters.search || '').toLowerCase();
-  const colour = STATE.dispatch.filters.colour || null;
-
-  return groups
-    .map(g => {
-      // Flatten group text once for faster matching
-      const text = g.rows.map(r => [
-        r['Order Number'], r['Item ID'], r['Colour'], r['Status'], r['User']
-      ].join(' ')).join(' ').toLowerCase();
-      const matchesSearch = !search || text.includes(search);
-      const matchesColour = !colour || g.rows.some(r => r['Colour'] === colour);
-      return (matchesSearch && matchesColour) ? g : null;
-    })
-    .filter(Boolean);
-}
-
-// Split groups into pages of approx pageSize rows (by items, not group count)
-function paginateGroups(groups, pageSize) {
-  const pages = [];
-  let current = { rows: [] };
-  let count = 0;
-
-  groups.forEach(g => {
-    const gSize = g.rows.length || 1;
-    // If adding this group would exceed the pageSize, start a new page
-    if (count > 0 && count + gSize > pageSize) {
-      pages.push(current);
-      current = { rows: [] };
-      count = 0;
-    }
-    // Push each row of the group into the current page
-    g.rows.forEach(r => current.rows.push(r));
-    count += gSize;
-  });
-
-  if (current.rows.length) pages.push(current);
-  return pages;
-}
 
 /***************
  * GLOBAL STATE
@@ -491,10 +597,15 @@ function loadReceiving() {
 }
 
     </script>
+ <footer class="app-footer">
+  <div class="footer-content">
+    <span>Created by Thurston.   HangerFlow © 2025 </span>
+    <span>Premierhangers (PTY) LTD </span>
+  </div>
+</footer>
+
   </body>
-
 </html>
-
 
 
 
