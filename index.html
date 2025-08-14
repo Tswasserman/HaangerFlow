@@ -906,8 +906,8 @@ if (itemsEl)   itemsEl.textContent   = totalItems.toLocaleString('en-ZA');
 if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
 if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }  
-/**************
- * DISPATCH
+//**************
+ * DISPATCHED
  ***************/
 
 function setupDispatchUI() {
@@ -939,6 +939,10 @@ function loadDispatch() {
         const d = new Date(iso);
         return {
           ...r,
+          // ✅ normalize numeric fields so totals/sorting are reliable
+          'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
+          'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
+          'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
           _ts: isNaN(d) ? new Date(0) : d,
           _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
           _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`
@@ -952,20 +956,33 @@ function loadDispatch() {
 
 function buildDispatchChips() {
   const wrap = document.getElementById('dispatchChips');
+  if (!wrap) return;
   wrap.innerHTML = '';
-  const colours = [...new Set(STATE.dispatch.raw.map(r => r['Colour']).filter(Boolean))].sort();
-  wrap.appendChild(makeChip('All', !STATE.dispatch.filters.colour, null, () => {
-    STATE.dispatch.filters.colour = null;
-    STATE.dispatch.pageIndex = 0;
-    recomputeDispatch();
-  }));
-  colours.forEach(c => {
-    wrap.appendChild(makeChip(c, STATE.dispatch.filters.colour===c, c, () => {
-      STATE.dispatch.filters.colour = c;
+
+  if (!STATE.dispatch.filters) STATE.dispatch.filters = { colour: null, search: '' };
+  const current = STATE.dispatch.filters.colour;
+
+  const makeActiveChip = (label, value) => {
+    const isActive = current === value;
+    const chip = makeChip(label, isActive, value, () => {
+      STATE.dispatch.filters.colour = value;
       STATE.dispatch.pageIndex = 0;
       recomputeDispatch();
-    }));
-  });
+      buildDispatchChips();
+    });
+    if (isActive) chip.classList.add('active');
+    return chip;
+  };
+
+  // ✅ "All" first
+  wrap.appendChild(makeActiveChip('All', null));
+
+  // ✅ normalized unique colours, sorted
+  const colours = [...new Set(
+    STATE.dispatch.raw.map(r => (r['Colour'] || '').toLowerCase().trim())
+  )].filter(Boolean).sort();
+
+  colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
 }
 
 function recomputeDispatch() {
@@ -1023,12 +1040,10 @@ function updateDispatchPager() {
   if (prevBtn) prevBtn.disabled = (totalPages === 0 || currentPage <= 1);
   if (nextBtn) nextBtn.disabled = (totalPages === 0 || currentPage >= totalPages);
 
-  // Row info
   const totalRows = STATE.dispatch.filteredGroups.reduce((sum,g) => sum + g.rows.length, 0);
   if (rowInfo) {
-    if (totalRows === 0) {
-      rowInfo.textContent = '0–0 of 0';
-    } else {
+    if (totalRows === 0) rowInfo.textContent = '0–0 of 0';
+    else {
       const start = (STATE.dispatch.pageIndex * STATE.dispatch.pageSize) + 1;
       const end = Math.min(start + STATE.dispatch.pageSize - 1, totalRows);
       rowInfo.textContent = `${start}–${end} of ${totalRows}`;
@@ -1266,6 +1281,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
