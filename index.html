@@ -246,6 +246,46 @@ function groupByOrder(rows) {
   });
   return Object.values(map);
 }
+// Filter grouped orders by search text and colour
+function applyDispatchFilters(groups) {
+  const search = (STATE.dispatch.filters.search || '').toLowerCase();
+  const colour = STATE.dispatch.filters.colour || null;
+
+  return groups
+    .map(g => {
+      // Flatten group text once for faster matching
+      const text = g.rows.map(r => [
+        r['Order Number'], r['Item ID'], r['Colour'], r['Status'], r['User']
+      ].join(' ')).join(' ').toLowerCase();
+      const matchesSearch = !search || text.includes(search);
+      const matchesColour = !colour || g.rows.some(r => r['Colour'] === colour);
+      return (matchesSearch && matchesColour) ? g : null;
+    })
+    .filter(Boolean);
+}
+
+// Split groups into pages of approx pageSize rows (by items, not group count)
+function paginateGroups(groups, pageSize) {
+  const pages = [];
+  let current = { rows: [] };
+  let count = 0;
+
+  groups.forEach(g => {
+    const gSize = g.rows.length || 1;
+    // If adding this group would exceed the pageSize, start a new page
+    if (count > 0 && count + gSize > pageSize) {
+      pages.push(current);
+      current = { rows: [] };
+      count = 0;
+    }
+    // Push each row of the group into the current page
+    g.rows.forEach(r => current.rows.push(r));
+    count += gSize;
+  });
+
+  if (current.rows.length) pages.push(current);
+  return pages;
+}
 
 /***************
  * GLOBAL STATE
@@ -454,6 +494,7 @@ function loadReceiving() {
   </body>
 
 </html>
+
 
 
 
