@@ -1100,7 +1100,6 @@ function loadReceiving(labelOverride) {
         const d = new Date(iso);
         return {
           ...r,
-          // normalize numerics for reliable totals/sort later
           'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
@@ -1253,7 +1252,9 @@ function updateReceivingTotals() {
   const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
 
   if (countEl)   countEl.textContent   = orders.toLocaleString('en-ZA');
-  if (qtyEl)     qtyEl.textContent    
+  if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
+  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
+}
 
     </script>
  <footer class="app-footer">
@@ -1265,6 +1266,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
