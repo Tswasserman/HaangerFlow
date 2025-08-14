@@ -218,6 +218,13 @@ if (!window.formatDate) {
     });
   };
 }
+function makeChip(label, isActive, value, onClick) {
+  const chip = document.createElement('button');
+  chip.className = 'chip' + (isActive ? ' active' : '');
+  chip.textContent = label;
+  chip.addEventListener('click', onClick);
+  return chip;
+}
 
 
      /***************
@@ -436,4 +443,5 @@ function loadReceiving() {
   </body>
 
 </html>
+
 
