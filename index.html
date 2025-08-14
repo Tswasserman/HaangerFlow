@@ -966,7 +966,58 @@ function buildDispatchChips() {
 
   colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
 }
+function renderDispatchFlat() {
+  const body = document.getElementById('dispatchBody');
+  body.innerHTML = '';
 
+  const ps = STATE.dispatch.pageSize;
+  const start = STATE.dispatch.pageIndex * ps;
+  const end = start + ps;
+  const rows = STATE.dispatch.filteredRows || [];
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="9" class="muted">No rows</td></tr>';
+  } else {
+    rows.slice(start, end).forEach(r => {
+      const tr = document.createElement('tr');
+      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+        .forEach(k => {
+          const td = document.createElement('td');
+          td.textContent = r[k] ?? '';
+          tr.appendChild(td);
+        });
+      body.appendChild(tr);
+    });
+  }
+
+  updateDispatchPagerFlat();
+  updateDispatchTotalsFlat();
+}
+
+function renderDispatchGrouped() {
+  const body = document.getElementById('dispatchBody');
+  body.innerHTML = '';
+
+  const page = STATE.dispatch.pages[STATE.dispatch.pageIndex] || { rows: [] };
+
+  if (!page.rows.length) {
+    body.innerHTML = '<tr><td colspan="9" class="muted">No rows</td></tr>';
+  } else {
+    page.rows.forEach(r => {
+      const tr = document.createElement('tr');
+      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+        .forEach(k => {
+          const td = document.createElement('td');
+          td.textContent = r[k] ?? '';
+          tr.appendChild(td);
+        });
+      body.appendChild(tr);
+    });
+  }
+
+  updateDispatchPagerGrouped();
+  updateDispatchTotalsGrouped();
+}
 function recomputeDispatch() {
   const search = (STATE.dispatch.filters.search || '').toLowerCase();
   const colour = STATE.dispatch.filters.colour;
@@ -1281,6 +1332,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
