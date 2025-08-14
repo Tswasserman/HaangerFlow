@@ -405,18 +405,75 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
   </div>
 </section>
       <!-- Recycled Stock Page -->
-<section id="page-recycled" class="page">
-  <div class="card">
-    <div class="toolbar">
-      <h2>Recycled Stock</h2>
+<section id="recycled-stock-page">
+  <div id="recycled-stock-card">
+    <div id="recycled-stock-toolbar">
+      <h2 id="recycled-stock-title">♻️ Recycled Stock</h2>
     </div>
 
-    <div class="placeholder" style="padding: 3rem; text-align: center; color: #777;">
-      <h3>♻️ Coming Soon</h3>
-      <p>This section will display recycled stock data once it’s ready to go live.</p>
+    <div id="recycled-stock-content">
+      <div id="recycled-stock-icon">♻️</div>
+      <h3 id="recycled-stock-heading">Coming Soon</h3>
+      <p id="recycled-stock-text">This section will display recycled stock data once it’s ready to go live.</p>
+      <small id="recycled-stock-note">Please check back after the next update.</small>
     </div>
   </div>
+
+  <style>
+    /* Scoped only to this block */
+    #recycled-stock-page {
+      padding: 1rem;
+      font-family: system-ui, sans-serif;
+    }
+    #recycled-stock-card {
+      border-radius: 10px;
+      background: linear-gradient(135deg, #f0f5f1 0%, #e3f2e6 100%);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+      overflow: hidden;
+      max-width: 600px;
+      margin: auto;
+    }
+    #recycled-stock-toolbar {
+      background: #2f855a;
+      color: #fff;
+      padding: 1rem 1.5rem;
+    }
+    #recycled-stock-title {
+      margin: 0;
+      font-weight: 600;
+      font-size: 1.25rem;
+    }
+    #recycled-stock-content {
+      padding: 3rem 2rem;
+      text-align: center;
+      color: #2d3748;
+    }
+    #recycled-stock-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      animation: recycledStockSpinSlow 8s linear infinite;
+      display: inline-block;
+    }
+    #recycled-stock-heading {
+      font-size: 1.5rem;
+      margin: 0 0 0.5rem;
+    }
+    #recycled-stock-text {
+      margin: 0 0 0.75rem;
+      color: #4a5568;
+    }
+    #recycled-stock-note {
+      color: #718096;
+      font-size: 0.85rem;
+    }
+    @keyframes recycledStockSpinSlow {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </section>
+
+
     </main>
 
     <script>
@@ -1052,7 +1109,7 @@ function setupReceivingUI() {
 }
 
 function loadReceiving() {
-  fetch(`${API.baseUrl}?dataset=receiving`)
+  fetch(`${API.baseUrl}?dataset=receiving&sheetName=${encodeURIComponent('Receiving Stock')}`)
     .then(res => res.json())
     .then(payload => {
       STATE.receiving.raw = (payload.rows || []).map(r => {
@@ -1231,6 +1288,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
