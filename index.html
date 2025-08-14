@@ -368,7 +368,8 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
 
     <script>
 
-// debounce
+
+// Throttle rapid calls
 window.debounce = window.debounce || function (fn, delay) {
   let t;
   return function (...args) {
@@ -377,161 +378,86 @@ window.debounce = window.debounce || function (fn, delay) {
   };
 };
 
-// formatDate
+// Upload status text
+window.setUploadStatus = window.setUploadStatus || function (text) {
+  const el = document.getElementById('uploadStatus');
+  if (el) el.textContent = text ?? '';
+};
+
+// "Last updated" stamp
+window.updateLastUpload = window.updateLastUpload || function (d) {
+  const el = document.getElementById('lastUpload');
+  if (!el) return;
+  const ts = window.formatDate ? window.formatDate(d) : '';
+  el.textContent = `Last update: ${ts || '–'}`;
+};
+
+// Consistent date formatting
 window.formatDate = window.formatDate || function (d) {
   let dt = d instanceof Date ? d : new Date(d);
   if (!(dt instanceof Date) || isNaN(dt)) return '';
   return dt.toLocaleString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
   });
 };
 
+// Filter/colour chip button
+window.makeChip = window.makeChip || function (label, isActive, _value, onClick) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'chip' + (isActive ? ' active' : '');
+  chip.textContent = label;
+  chip.addEventListener('click', onClick, { passive: true });
+  return chip;
+};
 
+// Group flat dispatch rows by order number
+window.groupByOrder = window.groupByOrder || function (rows) {
+  const map = Object.create(null);
+  (rows || []).forEach(r => {
+    const key = String(r['Order Number'] ?? r.order ?? '').trim();
+    if (!map[key]) map[key] = { order: key, rows: [] };
+    map[key].rows.push(r);
+  });
+  return Object.values(map);
+};
 
+// Filter dispatch groups by search/colour
+window.applyDispatchFilters = window.applyDispatchFilters || function (groups) {
+  const search = (STATE.dispatch.filters.search || '').toLowerCase();
+  const colour = STATE.dispatch.filters.colour || null;
+  return (groups || []).filter(g => {
+    const text = g.rows.map(r =>
+      `${r['Order Number']} ${r['Item ID']} ${r['Colour']} ${r['Status']} ${r['User']}`
+    ).join(' ').toLowerCase();
+    const matchesSearch = !search || text.includes(search);
+    const matchesColour = !colour || g.rows.some(r => 
+      (r['Colour'] || '').toLowerCase() === String(colour).toLowerCase()
+    );
+    return matchesSearch && matchesColour;
+  });
+};
 
-function setupStockUI() {
-  const debouncedSearch = debounce(() => { /* ... */ }, 300);
-}
-document.addEventListener('DOMContentLoaded', setupStockUI);
+// Keep grouped orders together in pagination
+window.paginateGroups = window.paginateGroups || function (groups, pageSize) {
+  const pages = [];
+  let current = { rows: [] };
+  let count = 0;
+  (groups || []).forEach(g => {
+    const gSize = g.rows?.length || 1;
+    if (count > 0 && count + gSize > pageSize) {
+      pages.push(current);
+      current = { rows: [] };
+      count = 0;
+    }
+    current.rows.push(...g.rows);
+    count += gSize;
+  });
+  if (current.rows.length) pages.push(current);
+  return pages;
+};
 
-
-
-(function () {
-  const w = window;
-
-  // Debounce
-  if (!w.debounce) {
-    w.debounce = function (fn, delay) {
-      let t;
-      return function (...args) {
-        clearTimeout(t);
-        t = setTimeout(() => fn.apply(this, args), delay);
-      };
-    };
-  }
-
-  // Upload/status UI
-  if (!w.setUploadStatus) {
-    w.setUploadStatus = function (text) {
-      const el = document.getElementById('uploadStatus');
-      if (el) el.textContent = text ?? '';
-    };
-  }
-
-  if (!w.updateLastUpload) {
-    w.updateLastUpload = function (d) {
-      const el = document.getElementById('lastUpload');
-      if (!el) return;
-      const ts = w.formatDate ? w.formatDate(d) : '';
-      el.textContent = `Last update: ${ts || '–'}`;
-    };
-  }
-
-  // Date formatting (accepts Date or ISO string)
-  if (!w.formatDate) {
-    w.formatDate = function (d) {
-      let dt = d instanceof Date ? d : new Date(d);
-      if (!(dt instanceof Date) || isNaN(dt)) return '';
-      return dt.toLocaleString('en-ZA', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    };
-  }
-
-  // Chip builder (used by stock/dispatch filters)
-  if (!w.makeChip) {
-    w.makeChip = function (label, isActive, _value, onClick) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'chip' + (isActive ? ' active' : '');
-      chip.textContent = label;
-      chip.addEventListener('click', onClick, { passive: true });
-      return chip;
-    };
-  }
-
-  // Dispatch: group flat rows by order number
-  if (!w.groupByOrder) {
-    w.groupByOrder = function (rows) {
-      const map = Object.create(null);
-      (rows || []).forEach(r => {
-        const key = String(r['Order Number'] ?? r.order ?? '').trim();
-        if (!map[key]) map[key] = { order: key, rows: [] };
-        map[key].rows.push(r);
-      });
-      return Object.values(map);
-    };
-  }
-
-  // Dispatch: apply search + colour filters to groups
-  if (!w.applyDispatchFilters) {
-    w.applyDispatchFilters = function (groups) {
-      const search = (w.STATE?.dispatch?.filters?.search || '').toLowerCase();
-      const colour = (w.STATE?.dispatch?.filters?.colour || null);
-
-      return (groups || [])
-        .map(g => {
-          const text = g.rows
-            .map(r => [
-              r['Order Number'],
-              r['Item ID'],
-              r['Colour'],
-              r['Status'],
-              r['User']
-            ].join(' '))
-            .join(' ')
-            .toLowerCase();
-
-          const matchesSearch = !search || text.includes(search);
-          const matchesColour =
-            !colour ||
-            g.rows.some(r => (r['Colour'] || '').toLowerCase() === String(colour).toLowerCase());
-
-          return (matchesSearch && matchesColour) ? g : null;
-        })
-        .filter(Boolean);
-    };
-  }
-
-  // Dispatch: paginate while keeping order rows together
-  // Returns an array of pages, each page is { rows: [...] } of flattened rows
-  if (!w.paginateGroups) {
-    w.paginateGroups = function (groups, pageSize) {
-      const pages = [];
-      let current = { rows: [] };
-      let count = 0;
-
-      (groups || []).forEach(g => {
-        const gSize = g.rows?.length || 1;
-
-        if (count > 0 && count + gSize > pageSize) {
-          pages.push(current);
-          current = { rows: [] };
-          count = 0;
-        }
-
-        g.rows.forEach(r => current.rows.push(r));
-        count += gSize;
-      });
-
-      if (current.rows.length) pages.push(current);
-      return pages;
-    };
-  }
-})
-     /***************
- * CONFIG
- ***************/
 const API = {
   baseUrl: 'https://script.google.com/macros/s/AKfycbzCF7yUZiprbPZtqCIRj6cy5iXaFYxs2iR22fArEFkIRG8Xq38DHcpzIz232OiKOPrdwg/exec',
   resource: 'stock',
@@ -751,6 +677,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
