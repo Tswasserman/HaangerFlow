@@ -179,6 +179,14 @@
     </main>
 
     <script>
+      function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
      /***************
  * CONFIG
  ***************/
@@ -393,4 +401,5 @@ function loadReceiving() {
 
     </script>
   </body>
+
 </html>
