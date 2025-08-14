@@ -553,7 +553,7 @@ const STATE = {
     data: [], filtered: [],
     sortKey: 'Colour', sortDir: 'asc',
     page: 1, pageSize: 50, colourFilter: null,
-    columns: ['timestamp','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code']
+    columns: ['timestamp','Item','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code']
   },
   dispatch: {
     raw: [], groups: [], filteredGroups: [], pages: [],
@@ -610,11 +610,12 @@ function switchPage(route) {
 STATE.stock = {
   data: [],
   filtered: [],
-  columns: ['timestamp','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code'],
+  columns: ['timestamp','Item','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code'],
 
   // filters/sort
   colourFilter: null,
   sortKey: 'PH Code',
+  sortKey: 'Item', 
   sortDir: 'asc',
 
   // paging
@@ -677,13 +678,15 @@ function loadStock() {
     .then(payload => {
       STATE.stock.data = (payload.rows || []).map(r => ({
         timestamp: r.timestampIso || r.timestamp || '',
+        Item: r['Item'] || '', 
         Colour: r['Colour'],
         'QTY Per Carton': r['QTY Per Carton'],
         'Total Cartons': r['Total Cartons'],
         'Total QTY': r['Total QTY'],
         'PH Code': r['PH Code'],
-        _searchKey: `${r['Colour'] || ''} ${r['PH Code'] || ''}`.toLowerCase()
+        _searchKey: `${r['Item'] || ''} ${r['Colour'] || ''} ${r['PH Code'] || ''}`.toLowerCase()
       }));
+
 
       buildStockChips();
       computeStockDerived();
@@ -1370,6 +1373,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
