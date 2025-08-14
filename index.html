@@ -397,6 +397,8 @@ window.formatDate = window.formatDate || function (d) {
 function setupStockUI() {
   const debouncedSearch = debounce(() => { /* ... */ }, 300);
 }
+document.addEventListener('DOMContentLoaded', setupStockUI);
+
 
 
 (function () {
@@ -749,6 +751,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
