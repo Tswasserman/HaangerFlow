@@ -517,54 +517,106 @@ function switchPage(route) {
 /***************
  * STOCK
  ***************/
+// ---------- STATE SHAPE ----------
+STATE.stock = {
+  data: [],            // raw rows
+  filtered: [],        // derived rows after filter + sort
+  columns: ['timestamp','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code'],
+
+  // filters/sort
+  colourFilter: null,  // null means "All"
+  sortKey: 'PH Code',
+  sortDir: 'asc',      // 'asc' | 'desc'
+
+  // paging
+  page: 1,
+  pageSize: 50,
+  totalPages: 1
+};
+
+// ---------- SETUP ----------
 function setupStockUI() {
   const head = document.getElementById('stockHeadRow');
   head.innerHTML = '';
   STATE.stock.columns.forEach(col => {
     const th = document.createElement('th');
     th.textContent = col;
-    th.addEventListener('click', () => toggleSort(col));
+    th.addEventListener('click', () => toggleStockSort(col));
     head.appendChild(th);
   });
+
+  // search
   document.getElementById('searchInput').addEventListener('input', debounce(() => {
-    STATE.stock.page = 1; applyStockFilters(); renderStock();
+    // filter changes should reset to first page
+    STATE.stock.page = 1;
+    computeStockDerived();
+    renderStock();
   }, 120));
+
+  // pager controls (IDs assumed; map to your existing elements if different)
+  const prevBtn = document.getElementById('stockPrevBtn');
+  const nextBtn = document.getElementById('stockNextBtn');
+  const sizeSel = document.getElementById('stockPerPageSelect');
+
+  if (prevBtn) prevBtn.addEventListener('click', () => {
+    goToStockPage(STATE.stock.page - 1);
+  });
+  if (nextBtn) nextBtn.addEventListener('click', () => {
+    goToStockPage(STATE.stock.page + 1);
+  });
+  if (sizeSel) sizeSel.addEventListener('change', (e) => {
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isNaN(v) && v > 0) {
+      STATE.stock.pageSize = v;
+      STATE.stock.page = 1;
+      computeStockDerived();
+      renderStock();
+    }
+  });
 }
+
+// ---------- DATA LOAD ----------
 function loadStock() {
   setUploadStatus('Loading…');
   fetch(`${API.baseUrl}?dataset=stock`)
     .then(res => res.json())
     .then(payload => {
-      STATE.stock.data = (payload.rows||[]).map(r => ({
+      STATE.stock.data = (payload.rows || []).map(r => ({
         timestamp: r.timestampIso || r.timestamp || '',
         Colour: r['Colour'],
         'QTY Per Carton': r['QTY Per Carton'],
         'Total Cartons': r['Total Cartons'],
         'Total QTY': r['Total QTY'],
         'PH Code': r['PH Code'],
-        _searchKey: `${r['Colour']||''} ${r['PH Code']||''}`.toLowerCase()
+        _searchKey: `${r['Colour'] || ''} ${r['PH Code'] || ''}`.toLowerCase()
       }));
+
       buildStockChips();
-      applyStockFilters();
+      computeStockDerived();
       renderStock();
+
       updateLastUpload(new Date());
       setUploadStatus('Loaded');
-    }).catch(err => { console.error(err); setUploadStatus('Failed'); });
+    })
+    .catch(err => { console.error(err); setUploadStatus('Failed'); });
 }
-      
+
+// ---------- CHIPS ----------
 function buildStockChips() {
   const wrap = document.getElementById('colourChips');
   wrap.innerHTML = '';
 
-  // "All" chip
-wrap.appendChild(
-  makeChip('All', STATE.stock.colourFilter === null, null, () => {
-    STATE.stock.colourFilter = null; // true reset
-    applyStockFilters();
-    renderStock();
-  })
-);
-  // Colour chips (normalized to lowercase)
+  // "All"
+  wrap.appendChild(
+    makeChip('All', STATE.stock.colourFilter === null, null, () => {
+      STATE.stock.colourFilter = null;
+      STATE.stock.page = 1;
+      computeStockDerived();
+      renderStock();
+    })
+  );
+
+  // colours
   const colours = [...new Set(
     STATE.stock.data.map(r => (r.Colour || '').toLowerCase().trim())
   )].filter(Boolean).sort();
@@ -572,59 +624,166 @@ wrap.appendChild(
   colours.forEach(c => {
     wrap.appendChild(makeChip(c, STATE.stock.colourFilter === c, c, () => {
       STATE.stock.colourFilter = c;
-      applyStockFilters();
+      STATE.stock.page = 1;
+      computeStockDerived();
       renderStock();
     }));
   });
 }
 
-function applyStockFilters() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+// ---------- DERIVATION (filter + sort + pagination math) ----------
+function computeStockDerived() {
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   const cf = STATE.stock.colourFilter;
+
   let out = STATE.stock.data;
 
+  // search
   if (q) out = out.filter(r => r._searchKey.includes(q));
 
-  // only apply colour filter if cf is not null
- // only apply colour filter if cf is NOT null
-if (cf !== null) {
-  out = out.filter(
-    r => (r.Colour || '').toLowerCase().trim() === cf
-  );
-}
+  // colour filter (only when not null)
+  if (cf !== null) {
+    out = out.filter(r => (r.Colour || '').toLowerCase().trim() === cf);
+  }
 
+  // sort
+  const key = STATE.stock.sortKey;
   const dir = STATE.stock.sortDir === 'asc' ? 1 : -1;
-  out.sort((a, b) =>
-    String(a[STATE.stock.sortKey] ?? '').localeCompare(
-      String(b[STATE.stock.sortKey] ?? ''), undefined, { numeric: true }
-    ) * dir
-  );
+
+  const numericCols = new Set(['QTY Per Carton','Total Cartons','Total QTY']);
+  const isDate = key === 'timestamp';
+  const isNumeric = numericCols.has(key);
+
+  out = out.slice().sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+
+    let cmp = 0;
+    if (isDate) {
+      const ad = av ? new Date(av).getTime() : 0;
+      const bd = bv ? new Date(bv).getTime() : 0;
+      cmp = (ad - bd);
+    } else if (isNumeric) {
+      const an = parseFloat(av ?? '');
+      const bn = parseFloat(bv ?? '');
+      cmp = ((isNaN(an) ? -Infinity : an) - (isNaN(bn) ? -Infinity : bn));
+    } else {
+      cmp = String(av ?? '').localeCompare(String(bv ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    if (cmp === 0) {
+      // stable tie-breakers to keep paging stable
+      cmp = String(a['PH Code'] ?? '').localeCompare(String(b['PH Code'] ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      if (cmp === 0) {
+        cmp = String(a['Colour'] ?? '').localeCompare(String(b['Colour'] ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+        if (cmp === 0) {
+          const ad = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const bd = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          cmp = ad - bd;
+        }
+      }
+    }
+
+    return cmp * dir;
+  });
 
   STATE.stock.filtered = out;
+
+  // pagination math
+  const len = out.length;
+  const ps = STATE.stock.pageSize;
+  const pages = Math.ceil(len / ps);
+  STATE.stock.totalPages = pages || 0;
+
+  // clamp page
+  if (pages === 0) {
+    STATE.stock.page = 0; // represent empty state clearly
+  } else {
+    if (STATE.stock.page < 1) STATE.stock.page = 1;
+    if (STATE.stock.page > pages) STATE.stock.page = pages;
+  }
 }
 
+// ---------- RENDER ----------
 function renderStock() {
+  // table
   const body = document.getElementById('stockBody');
   body.innerHTML = '';
+
   const ps = STATE.stock.pageSize;
-  const start = (STATE.stock.page-1)*ps;
+  const p = STATE.stock.page;
+  const start = p > 0 ? (p - 1) * ps : 0;
   const end = start + ps;
-  STATE.stock.filtered.slice(start, end).forEach(r => {
+
+  const pageRows = (p === 0) ? [] : STATE.stock.filtered.slice(start, end);
+
+  if (pageRows.length === 0) {
     const tr = document.createElement('tr');
-    STATE.stock.columns.forEach(col => {
-      const td = document.createElement('td');
-      td.textContent = col==='timestamp' && r[col] ? new Date(r[col]).toLocaleString() : (r[col]??'');
-      tr.appendChild(td);
-    });
+    const td = document.createElement('td');
+    td.colSpan = STATE.stock.columns.length;
+    td.textContent = 'No stock to display';
+    tr.appendChild(td);
     body.appendChild(tr);
-  });
-}
-function toggleSort(col) {
-  STATE.stock.sortKey = col;
-  STATE.stock.sortDir = STATE.stock.sortDir === 'asc' ? 'desc' : 'asc';
-  applyStockFilters(); renderStock();
+  } else {
+    pageRows.forEach(r => {
+      const tr = document.createElement('tr');
+      STATE.stock.columns.forEach(col => {
+        const td = document.createElement('td');
+        if (col === 'timestamp' && r[col]) {
+          // localize to SA time; safe even if unsupported
+          td.textContent = new Date(r[col]).toLocaleString('en-ZA', { hour12: false, timeZone: 'Africa/Johannesburg' });
+        } else {
+          td.textContent = r[col] ?? '';
+        }
+        tr.appendChild(td);
+      });
+      tr.dataset.phCode = r['PH Code'] ?? '';
+      tr.dataset.colour = (r['Colour'] ?? '').toLowerCase().trim();
+      body.appendChild(tr);
+    });
+  }
+
+  // pager
+  updateStockPager();
 }
 
+function updateStockPager() {
+  const label = document.getElementById('stockPagerLabel'); // shows "X / Y"
+  const prevBtn = document.getElementById('stockPrevBtn');
+  const nextBtn = document.getElementById('stockNextBtn');
+
+  const p = STATE.stock.page;
+  const t = STATE.stock.totalPages;
+
+  if (label) {
+    if (t === 0) label.textContent = '0 / 0';
+    else label.textContent = `${p} / ${t}`;
+  }
+  if (prevBtn) prevBtn.disabled = (t === 0 || p <= 1);
+  if (nextBtn) nextBtn.disabled = (t === 0 || p >= t);
+}
+
+// ---------- INTERACTIONS ----------
+function goToStockPage(n) {
+  if (STATE.stock.totalPages === 0) {
+    STATE.stock.page = 0;
+  } else {
+    STATE.stock.page = Math.max(1, Math.min(n, STATE.stock.totalPages));
+  }
+  renderStock();
+}
+
+function toggleStockSort(col) {
+  if (STATE.stock.sortKey === col) {
+    STATE.stock.sortDir = STATE.stock.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    STATE.stock.sortKey = col;
+    STATE.stock.sortDir = 'asc';
+  }
+  // keep current page but clamp after resort
+  computeStockDerived();
+  renderStock();
+}
 /***************
  * DISPATCH
  ***************/
@@ -709,6 +868,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
