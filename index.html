@@ -520,21 +520,29 @@ function switchPage(route) {
 /***************
  * STOCK
  ***************/
-// ---------- STATE SHAPE ----------
 // ---------- STATE ----------
 STATE.stock = {
   data: [],
   filtered: [],
   columns: ['timestamp','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code'],
 
+  // filters/sort
   colourFilter: null,
   sortKey: 'PH Code',
   sortDir: 'asc',
 
+  // paging
   page: 1,
   pageSize: 50,
   totalPages: 1
 };
+
+// ---------- HELPERS ----------
+function numOrNaN(v) {
+  if (v === null || v === undefined || v === '') return NaN;
+  const n = Number(String(v).replace(/[^\d.-]/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+}
 
 // ---------- SETUP ----------
 function setupStockUI() {
@@ -548,11 +556,14 @@ function setupStockUI() {
   });
 
   // search
-  document.getElementById('searchInput').addEventListener('input', debounce(() => {
-    STATE.stock.page = 1;
-    computeStockDerived();
-    renderStock();
-  }, 120));
+  const searchEl = document.getElementById('searchInput');
+  if (searchEl) {
+    searchEl.addEventListener('input', debounce(() => {
+      STATE.stock.page = 1;
+      computeStockDerived();
+      renderStock();
+    }, 120));
+  }
 
   // pager controls
   const prevBtn = document.getElementById('stockPrevBtn');
@@ -601,6 +612,7 @@ function loadStock() {
 // ---------- CHIPS ----------
 function buildStockChips() {
   const wrap = document.getElementById('colourChips');
+  if (!wrap) return;
   wrap.innerHTML = '';
 
   const makeActiveChip = (label, value) => {
@@ -610,14 +622,16 @@ function buildStockChips() {
       STATE.stock.page = 1;
       computeStockDerived();
       renderStock();
-      buildStockChips();
+      buildStockChips(); // rebuild so .active is reapplied
     });
     if (isActive) chip.classList.add('active');
     return chip;
   };
 
+  // "All"
   wrap.appendChild(makeActiveChip('All', null));
 
+  // colours
   const colours = [...new Set(
     STATE.stock.data.map(r => (r.Colour || '').toLowerCase().trim())
   )].filter(Boolean).sort();
@@ -625,16 +639,22 @@ function buildStockChips() {
   colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
 }
 
-// ---------- DERIVATION ----------
+// ---------- DERIVATION (filter + sort + pagination math) ----------
 function computeStockDerived() {
   const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   const cf = STATE.stock.colourFilter;
 
   let out = STATE.stock.data;
 
+  // search
   if (q) out = out.filter(r => r._searchKey.includes(q));
-  if (cf !== null) out = out.filter(r => (r.Colour || '').toLowerCase().trim() === cf);
 
+  // colour filter (only when not null)
+  if (cf !== null) {
+    out = out.filter(r => (r.Colour || '').toLowerCase().trim() === cf);
+  }
+
+  // sort
   const key = STATE.stock.sortKey;
   const dir = STATE.stock.sortDir === 'asc' ? 1 : -1;
 
@@ -645,47 +665,68 @@ function computeStockDerived() {
   out = out.slice().sort((a, b) => {
     const av = a[key];
     const bv = b[key];
-    let cmp = 0;
 
+    let cmp = 0;
     if (isDate) {
-      cmp = (new Date(av).getTime() || 0) - (new Date(bv).getTime() || 0);
+      const ad = av ? new Date(av).getTime() : 0;
+      const bd = bv ? new Date(bv).getTime() : 0;
+      cmp = ad - bd;
     } else if (isNumeric) {
-      const an = parseFloat(av) || 0;
-      const bn = parseFloat(bv) || 0;
-      cmp = an - bn;
+      const an = numOrNaN(av);
+      const bn = numOrNaN(bv);
+      const as = Number.isNaN(an) ? -Infinity : an;
+      const bs = Number.isNaN(bn) ? -Infinity : bn;
+      cmp = as - bs;
     } else {
       cmp = String(av ?? '').localeCompare(String(bv ?? ''), undefined, { numeric: true, sensitivity: 'base' });
     }
 
     if (cmp === 0) {
-      cmp = String(a['PH Code'] ?? '').localeCompare(String(b['PH Code'] ?? ''), undefined, { numeric: true, sensitivity: 'base' })
-         || String(a['Colour'] ?? '').localeCompare(String(b['Colour'] ?? ''), undefined, { numeric: true, sensitivity: 'base' })
-         || ((new Date(a.timestamp).getTime() || 0) - (new Date(b.timestamp).getTime() || 0));
+      // stable tie-breakers to keep paging stable
+      cmp = String(a['PH Code'] ?? '').localeCompare(String(b['PH Code'] ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      if (cmp === 0) {
+        cmp = String(a['Colour'] ?? '').localeCompare(String(b['Colour'] ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+        if (cmp === 0) {
+          const ad = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const bd = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          cmp = ad - bd;
+        }
+      }
     }
+
     return cmp * dir;
   });
 
   STATE.stock.filtered = out;
 
+  // pagination math
   const len = out.length;
   const ps = STATE.stock.pageSize;
-  STATE.stock.totalPages = Math.max(1, Math.ceil(len / ps));
+  const pages = Math.ceil(len / ps);
+  STATE.stock.totalPages = pages || 0;
 
-  // clamp page to available range
-  STATE.stock.page = Math.min(Math.max(STATE.stock.page, 1), STATE.stock.totalPages);
+  // clamp page
+  if (pages === 0) {
+    STATE.stock.page = 0; // represent empty state clearly
+  } else {
+    if (STATE.stock.page < 1) STATE.stock.page = 1;
+    if (STATE.stock.page > pages) STATE.stock.page = pages;
+  }
 }
 
 // ---------- RENDER ----------
 function renderStock() {
+  // table
   const body = document.getElementById('stockBody');
+  if (!body) return;
   body.innerHTML = '';
 
   const ps = STATE.stock.pageSize;
   const p = STATE.stock.page;
-  const start = (p - 1) * ps;
+  const start = p > 0 ? (p - 1) * ps : 0;
   const end = start + ps;
 
-  const pageRows = STATE.stock.filtered.slice(start, end);
+  const pageRows = (p === 0) ? [] : STATE.stock.filtered.slice(start, end);
 
   if (pageRows.length === 0) {
     const tr = document.createElement('tr');
@@ -700,36 +741,47 @@ function renderStock() {
       STATE.stock.columns.forEach(col => {
         const td = document.createElement('td');
         if (col === 'timestamp' && r[col]) {
+          // localize to SA time; safe even if unsupported
           td.textContent = new Date(r[col]).toLocaleString('en-ZA', { hour12: false, timeZone: 'Africa/Johannesburg' });
         } else {
           td.textContent = r[col] ?? '';
         }
         tr.appendChild(td);
       });
+      tr.dataset.phCode = r['PH Code'] ?? '';
+      tr.dataset.colour = (r['Colour'] ?? '').toLowerCase().trim();
       body.appendChild(tr);
     });
   }
 
+  // pager + totals
   updateStockPager();
   updateStockTotals();
 }
 
 // ---------- PAGER LABEL + BUTTONS ----------
 function updateStockPager() {
-  const label = document.getElementById('stockPagerLabel');
+  const label = document.getElementById('stockPagerLabel'); // shows "X / Y"
   const prevBtn = document.getElementById('stockPrevBtn');
   const nextBtn = document.getElementById('stockNextBtn');
 
   const p = STATE.stock.page;
   const t = STATE.stock.totalPages;
 
-  if (label) label.textContent = `${p} / ${t}`;
-  if (prevBtn) prevBtn.disabled = p <= 1;
-  if (nextBtn) nextBtn.disabled = p >= t;
+  if (label) {
+    if (t === 0) label.textContent = '0 / 0';
+    else label.textContent = `${p} / ${t}`;
+  }
+  if (prevBtn) prevBtn.disabled = (t === 0 || p <= 1);
+  if (nextBtn) nextBtn.disabled = (t === 0 || p >= t);
 }
 
 function goToStockPage(n) {
-  STATE.stock.page = Math.min(Math.max(n, 1), STATE.stock.totalPages);
+  if (STATE.stock.totalPages === 0) {
+    STATE.stock.page = 0;
+  } else {
+    STATE.stock.page = Math.max(1, Math.min(n, STATE.stock.totalPages));
+  }
   renderStock();
 }
 
@@ -740,6 +792,7 @@ function toggleStockSort(col) {
     STATE.stock.sortKey = col;
     STATE.stock.sortDir = 'asc';
   }
+  // keep current page but clamp after resort
   computeStockDerived();
   renderStock();
 }
@@ -750,12 +803,23 @@ function updateStockTotals() {
   const qtyEl     = document.getElementById('stockTotalQty');
   const cartonsEl = document.getElementById('stockTotalCartons');
 
+  // work from the already‑filtered list (grand totals, not page-only)
   const rows = STATE.stock.filtered;
-  const totalItems   = rows.length;
-  const totalQty     = rows.reduce((sum, r) => sum + (parseFloat(r['Total QTY']) || 0), 0);
-  const totalCartons = rows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
 
-  if (itemsEl)   itemsEl.textContent  
+  const totalItems   = rows.length;
+  const totalQty     = rows.reduce((sum, r) => {
+    const n = numOrNaN(r['Total QTY']);
+    return sum + (Number.isNaN(n) ? 0 : n);
+  }, 0);
+  const totalCartons = rows.reduce((sum, r) => {
+    const n = numOrNaN(r['Total Cartons']);
+    return sum + (Number.isNaN(n) ? 0 : n);
+  }, 0);
+
+  if (itemsEl)   itemsEl.textContent   = totalItems;
+  if (qtyEl)     qtyEl.textContent     = totalQty;
+  if (cartonsEl) cartonsEl.textContent = totalCartons;
+}  
 /***************
  * DISPATCH
  ***************/
@@ -840,6 +904,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
