@@ -1080,7 +1080,7 @@ function setupReceivingUI() {
 }
 
 function loadReceiving() {
-  fetch(`${API.baseUrl}?dataset=receiving&sheetName=${encodeURIComponent('Receiving Stock')}`)
+  fetch(`${API.baseUrl}?dataset=receiving&sheetName=${encodeURIComponent('Receiving Reports')}`)
     .then(res => res.json())
     .then(payload => {
       STATE.receiving.raw = (payload.rows || []).map(r => {
@@ -1259,6 +1259,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
