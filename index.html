@@ -367,9 +367,42 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
       </section>
 
       <!-- Receiving Page -->
-      <section id="page-receiving" class="page">
-        <div class="placeholder">Receiving page — coming soon.</div>
-      </section>
+      <!-- Receiving Page -->
+<section id="page-receiving" class="page">
+  <div class="card">
+    <div class="toolbar">
+      <div id="receivingChips" class="chips"></div>
+      <div class="search">
+        <input type="text" id="receivingSearch" placeholder="Search Order Number, Colour, or Status…">
+      </div>
+    </div>
+
+    <div class="kpi">
+      <div class="pill">Orders<strong id="receivingCount">0</strong></div>
+      <div class="pill">Total Qty<strong id="receivingQty">0</strong></div>
+      <div class="pill">Total Cartons<strong id="receivingCartons">0</strong></div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="receivingTable">
+        <thead><tr id="receivingHeadRow"></tr></thead>
+        <tbody id="receivingBody"></tbody>
+      </table>
+    </div>
+
+    <div class="footerbar">
+      <div class="muted" id="receivingRowInfo">0–0 of 0</div>
+      <div class="pager">
+        <button id="receivingPrev">Prev</button>
+        <span class="muted" id="receivingPageNum">1</span>
+        <button id="receivingNext">Next</button>
+        <select id="receivingPageSize">
+          <option>25</option><option selected>50</option><option>100</option><option>200</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
     </main>
 
     <script>
@@ -823,15 +856,30 @@ if (itemsEl)   itemsEl.textContent   = totalItems.toLocaleString('en-ZA');
 if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
 if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }  
-/***************
+/**************
  * DISPATCH
  ***************/
+
 function setupDispatchUI() {
   document.getElementById('dispatchSearch').addEventListener('input', debounce(() => {
     STATE.dispatch.filters.search = document.getElementById('dispatchSearch').value.trim().toLowerCase();
+    STATE.dispatch.pageIndex = 0; // reset to first page
     recomputeDispatch();
   }, 120));
+
+  // pager controls
+  document.getElementById('dispatchPrev').addEventListener('click', () => goDispatchPage(STATE.dispatch.pageIndex - 1));
+  document.getElementById('dispatchNext').addEventListener('click', () => goDispatchPage(STATE.dispatch.pageIndex + 1));
+  document.getElementById('dispatchPageSize').addEventListener('change', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isNaN(v) && v > 0) {
+      STATE.dispatch.pageSize = v;
+      STATE.dispatch.pageIndex = 0;
+      recomputeDispatch();
+    }
+  });
 }
+
 function loadDispatch() {
   fetch(`${API.baseUrl}?dataset=dispatch`)
     .then(res => res.json())
@@ -848,17 +896,28 @@ function loadDispatch() {
       });
       buildDispatchChips();
       recomputeDispatch();
-    }).catch(err => console.error(err));
+    })
+    .catch(err => console.error(err));
 }
+
 function buildDispatchChips() {
   const wrap = document.getElementById('dispatchChips');
   wrap.innerHTML = '';
   const colours = [...new Set(STATE.dispatch.raw.map(r => r['Colour']).filter(Boolean))].sort();
-  wrap.appendChild(makeChip('All', !STATE.dispatch.filters.colour, null, () => { STATE.dispatch.filters.colour=null; recomputeDispatch(); }));
+  wrap.appendChild(makeChip('All', !STATE.dispatch.filters.colour, null, () => {
+    STATE.dispatch.filters.colour = null;
+    STATE.dispatch.pageIndex = 0;
+    recomputeDispatch();
+  }));
   colours.forEach(c => {
-    wrap.appendChild(makeChip(c, STATE.dispatch.filters.colour===c, c, () => { STATE.dispatch.filters.colour=c; recomputeDispatch(); }));
+    wrap.appendChild(makeChip(c, STATE.dispatch.filters.colour===c, c, () => {
+      STATE.dispatch.filters.colour = c;
+      STATE.dispatch.pageIndex = 0;
+      recomputeDispatch();
+    }));
   });
 }
+
 function recomputeDispatch() {
   let groups = groupByOrder(STATE.dispatch.raw);
   groups = applyDispatchFilters(groups);
@@ -866,35 +925,225 @@ function recomputeDispatch() {
   STATE.dispatch.pages = paginateGroups(groups, STATE.dispatch.pageSize);
   renderDispatch();
 }
+
 function renderDispatch() {
   const body = document.getElementById('dispatchBody');
   body.innerHTML = '';
   const page = STATE.dispatch.pages[STATE.dispatch.pageIndex] || { rows: [] };
-  if (!page.rows.length) { body.innerHTML='<tr><td colspan="9" class="muted">No rows</td></tr>'; return; }
-  page.rows.forEach(r => {
-    const tr = document.createElement('tr');
-    ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
-    .forEach(k => {
-      const td = document.createElement('td');
-      td.textContent = r[k] ?? '';
-      tr.appendChild(td);
+
+  if (!page.rows.length) {
+    body.innerHTML='<tr><td colspan="9" class="muted">No rows</td></tr>';
+  } else {
+    page.rows.forEach(r => {
+      const tr = document.createElement('tr');
+      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      .forEach(k => {
+        const td = document.createElement('td');
+        td.textContent = r[k] ?? '';
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
     });
-    body.appendChild(tr);
-  });
+  }
+
+  updateDispatchPager();
+  updateDispatchTotals();
+}
+
+function goDispatchPage(n) {
+  const totalPages = STATE.dispatch.pages.length;
+  STATE.dispatch.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
+  renderDispatch();
+}
+
+function updateDispatchPager() {
+  const pageNumEl = document.getElementById('dispatchPageNum');
+  const prevBtn = document.getElementById('dispatchPrev');
+  const nextBtn = document.getElementById('dispatchNext');
+  const rowInfo = document.getElementById('dispatchRowInfo');
+
+  const totalPages = STATE.dispatch.pages.length;
+  const currentPage = STATE.dispatch.pageIndex + 1;
+
+  if (pageNumEl) {
+    if (totalPages === 0) pageNumEl.textContent = '0 / 0';
+    else pageNumEl.textContent = `${currentPage} / ${totalPages}`;
+  }
+
+  if (prevBtn) prevBtn.disabled = (totalPages === 0 || currentPage <= 1);
+  if (nextBtn) nextBtn.disabled = (totalPages === 0 || currentPage >= totalPages);
+
+  // Row info
+  const totalRows = STATE.dispatch.filteredGroups.reduce((sum,g) => sum + g.rows.length, 0);
+  if (rowInfo) {
+    if (totalRows === 0) {
+      rowInfo.textContent = '0–0 of 0';
+    } else {
+      const start = (STATE.dispatch.pageIndex * STATE.dispatch.pageSize) + 1;
+      const end = Math.min(start + STATE.dispatch.pageSize - 1, totalRows);
+      rowInfo.textContent = `${start}–${end} of ${totalRows}`;
+    }
+  }
+}
+
+function updateDispatchTotals() {
+  const countEl = document.getElementById('dispatchCount');
+  const qtyEl = document.getElementById('dispatchQty');
+  const cartonsEl = document.getElementById('dispatchCartons');
+
+  const allRows = STATE.dispatch.filteredGroups.flatMap(g => g.rows);
+  const totalOrders = STATE.dispatch.filteredGroups.length;
+  const totalQty = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Qty']) || 0), 0);
+  const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
+
+  if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
+  if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
+  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }
 
 /***************
  * RECEIVING
  ***************/
+/**************
+ * RECEIVING
+ ***************/
+function setupReceivingUI() {
+  document.getElementById('receivingSearch').addEventListener('input', debounce(() => {
+    STATE.receiving.filters.search = document.getElementById('receivingSearch').value.trim().toLowerCase();
+    STATE.receiving.pageIndex = 0;
+    recomputeReceiving();
+  }, 120));
+
+  document.getElementById('receivingPrev').addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex - 1));
+  document.getElementById('receivingNext').addEventListener('click', () => goReceivingPage(STATE.receiving.pageIndex + 1));
+  document.getElementById('receivingPageSize').addEventListener('change', e => {
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isNaN(v) && v > 0) {
+      STATE.receiving.pageSize = v;
+      STATE.receiving.pageIndex = 0;
+      recomputeReceiving();
+    }
+  });
+}
+
 function loadReceiving() {
   fetch(`${API.baseUrl}?dataset=receiving`)
     .then(res => res.json())
     .then(payload => {
-      STATE.receiving.data = payload.rows || [];
-      console.log('Receiving rows', STATE.receiving.data);
-      // TODO: render table like stock
+      STATE.receiving.raw = (payload.rows||[]).map(r => {
+        const iso = r.timestampIso || r['Timestamp'] || '';
+        const d = new Date(iso);
+        return {
+          ...r,
+          _ts: isNaN(d) ? new Date(0) : d,
+          _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
+          _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`
+        };
+      });
+      buildReceivingChips();
+      recomputeReceiving();
     })
     .catch(err => console.error(err));
+}
+
+function buildReceivingChips() {
+  const wrap = document.getElementById('receivingChips');
+  wrap.innerHTML = '';
+  const colours = [...new Set(STATE.receiving.raw.map(r => r['Colour']).filter(Boolean))].sort();
+  wrap.appendChild(makeChip('All', !STATE.receiving.filters.colour, null, () => {
+    STATE.receiving.filters.colour = null;
+    STATE.receiving.pageIndex = 0;
+    recomputeReceiving();
+  }));
+  colours.forEach(c => {
+    wrap.appendChild(makeChip(c, STATE.receiving.filters.colour===c, c, () => {
+      STATE.receiving.filters.colour = c;
+      STATE.receiving.pageIndex = 0;
+      recomputeReceiving();
+    }));
+  });
+}
+
+function recomputeReceiving() {
+  let groups = groupByOrder(STATE.receiving.raw);
+  groups = applyReceivingFilters(groups); // similar to dispatch filters
+  STATE.receiving.filteredGroups = groups;
+  STATE.receiving.pages = paginateGroups(groups, STATE.receiving.pageSize);
+  renderReceiving();
+}
+
+function renderReceiving() {
+  const body = document.getElementById('receivingBody');
+  body.innerHTML = '';
+  const page = STATE.receiving.pages[STATE.receiving.pageIndex] || { rows: [] };
+
+  if (!page.rows.length) {
+    body.innerHTML='<tr><td colspan="9" class="muted">No rows</td></tr>';
+  } else {
+    page.rows.forEach(r => {
+      const tr = document.createElement('tr');
+      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      .forEach(k => {
+        const td = document.createElement('td');
+        td.textContent = r[k] ?? '';
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+  }
+
+  updateReceivingPager();
+  updateReceivingTotals();
+}
+
+function goReceivingPage(n) {
+  const totalPages = STATE.receiving.pages.length;
+  STATE.receiving.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
+  renderReceiving();
+}
+
+function updateReceivingPager() {
+  const pageNumEl = document.getElementById('receivingPageNum');
+  const prevBtn = document.getElementById('receivingPrev');
+  const nextBtn = document.getElementById('receivingNext');
+  const rowInfo = document.getElementById('receivingRowInfo');
+
+  const totalPages = STATE.receiving.pages.length;
+  const currentPage = STATE.receiving.pageIndex + 1;
+
+  if (pageNumEl) {
+    if (totalPages === 0) pageNumEl.textContent = '0 / 0';
+    else pageNumEl.textContent = `${currentPage} / ${totalPages}`;
+  }
+
+  if (prevBtn) prevBtn.disabled = (totalPages === 0 || currentPage <= 1);
+  if (nextBtn) nextBtn.disabled = (totalPages === 0 || currentPage >= totalPages);
+
+  const totalRows = STATE.receiving.filteredGroups.reduce((sum,g) => sum + g.rows.length, 0);
+  if (rowInfo) {
+    if (totalRows === 0) {
+      rowInfo.textContent = '0–0 of 0';
+    } else {
+      const start = (STATE.receiving.pageIndex * STATE.receiving.pageSize) + 1;
+      const end = Math.min(start + STATE.receiving.pageSize - 1, totalRows);
+      rowInfo.textContent = `${start}–${end} of ${totalRows}`;
+    }
+  }
+}
+
+function updateReceivingTotals() {
+  const countEl = document.getElementById('receivingCount');
+  const qtyEl = document.getElementById('receivingQty');
+  const cartonsEl = document.getElementById('receivingCartons');
+
+  const allRows = STATE.receiving.filteredGroups.flatMap(g => g.rows);
+  const totalOrders = STATE.receiving.filteredGroups.length;
+  const totalQty = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Qty']) || 0), 0);
+  const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
+
+  if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
+  if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
+  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }
 
     </script>
@@ -907,6 +1156,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
