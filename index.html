@@ -235,6 +235,17 @@ const API = {
   resource: 'stock',
   useJsonpFallback: true
 };
+function groupByOrder(rows) {
+  const map = {};
+  rows.forEach(r => {
+    const orderNum = String(r['Order Number'] || '').trim();
+    if (!map[orderNum]) {
+      map[orderNum] = { order: orderNum, rows: [] };
+    }
+    map[orderNum].rows.push(r);
+  });
+  return Object.values(map);
+}
 
 /***************
  * GLOBAL STATE
@@ -443,5 +454,6 @@ function loadReceiving() {
   </body>
 
 </html>
+
 
 
