@@ -286,45 +286,48 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
 
 
     <main>
-      <!-- Stock Page -->
-      <section id="page-stock" class="page active">
-        <div class="card">
-          <div class="toolbar">
-            <div id="colourChips" class="chips"></div>
-            <div class="search">
-              <input type="text" id="searchInput" placeholder="Search item, colour or PH code...">
-            </div>
-          </div>
+     <!-- Stock Page -->
+<section id="page-stock" class="page active">
+  <div class="card">
+    <div class="toolbar">
+      <div id="colourChips" class="chips"></div>
+      <div class="search">
+        <input type="text" id="searchInput" placeholder="Search item, colour or PH code...">
+      </div>
+    </div>
 
-          <div id="uploadStatus" class="upload-status">Waiting…</div>
-          <div id="lastUpload" class="last-upload">Last update: –</div>
+    <div id="uploadStatus" class="upload-status">Waiting…</div>
+    <div id="lastUpload" class="last-upload">Last update: –</div>
 
-          <div class="kpi">
-            <div class="pill">Items<strong id="kpiItems">0</strong></div>
-            <div class="pill">Total QTY<strong id="kpiTotalQty">0</strong></div>
-            <div class="pill">Total Cartons<strong id="kpiCartons">0</strong></div>
-          </div>
+    <div class="kpi">
+      <div class="pill">Items<strong id="stockTotalItems">0</strong></div>
+      <div class="pill">Total QTY<strong id="stockTotalQty">0</strong></div>
+      <div class="pill">Total Cartons<strong id="stockTotalCartons">0</strong></div>
+    </div>
 
-          <div class="table-wrap">
-            <table id="stockTable">
-              <thead><tr id="stockHeadRow"></tr></thead>
-              <tbody id="stockBody"></tbody>
-            </table>
-          </div>
+    <div class="table-wrap">
+      <table id="stockTable">
+        <thead><tr id="stockHeadRow"></tr></thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
 
-          <div class="footerbar">
-            <div class="muted" id="rowInfo">0–0 of 0</div>
-            <div class="pager">
-              <button id="prevBtn">Prev</button>
-              <span class="muted" id="pageNum">1</span>
-              <button id="nextBtn">Next</button>
-              <select id="pageSize" title="Rows per page">
-                <option>25</option><option selected>50</option><option>100</option><option>200</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div class="footerbar">
+      <div class="muted" id="rowInfo">0–0 of 0</div>
+      <div class="pager">
+        <button id="stockPrevBtn">Prev</button>
+        <span class="muted" id="stockPagerLabel">1 / 1</span>
+        <button id="stockNextBtn">Next</button>
+        <select id="stockPerPageSelect" title="Rows per page">
+          <option>25</option>
+          <option selected>50</option>
+          <option>100</option>
+          <option>200</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
 
       <!-- Dispatch Page -->
       <section id="page-dispatch" class="page">
@@ -904,6 +907,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
