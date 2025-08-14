@@ -819,9 +819,9 @@ function updateStockTotals() {
     return sum + (Number.isNaN(n) ? 0 : n);
   }, 0);
 
-  if (itemsEl)   itemsEl.textContent   = totalItems;
-  if (qtyEl)     qtyEl.textContent     = totalQty;
-  if (cartonsEl) cartonsEl.textContent = totalCartons;
+if (itemsEl)   itemsEl.textContent   = totalItems.toLocaleString('en-ZA');
+if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
+if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
 }  
 /***************
  * DISPATCH
@@ -907,6 +907,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
