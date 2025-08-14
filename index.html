@@ -892,7 +892,7 @@ function renderStock() {
 function setupDispatchUI() {
   document.getElementById('dispatchSearch').addEventListener('input', debounce(() => {
     STATE.dispatch.filters.search = document.getElementById('dispatchSearch').value.trim().toLowerCase();
-    STATE.dispatch.pageIndex = 0; // reset to first page
+    STATE.dispatch.pageIndex = 0;
     recomputeDispatch();
   }, 120));
 
@@ -918,19 +918,22 @@ function loadDispatch() {
         const d = new Date(iso);
         return {
           ...r,
-          // ✅ normalize numeric fields so totals/sorting are reliable
+          // numeric normalisation
           'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
+          // date + ID
           _ts: isNaN(d) ? new Date(0) : d,
           _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
-          _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`
+          _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`,
+          // colour normalisation for filters/chips
+          _normColour: (r['Colour'] || '').toLowerCase().trim()
         };
       });
       buildDispatchChips();
       recomputeDispatch();
     })
-    .catch(err => console.error(err));
+    .catch(console.error);
 }
 
 function buildDispatchChips() {
@@ -953,12 +956,12 @@ function buildDispatchChips() {
     return chip;
   };
 
-  // ✅ "All" first
+  // All first
   wrap.appendChild(makeActiveChip('All', null));
 
-  // ✅ normalized unique colours, sorted
+  // unique normalised colours
   const colours = [...new Set(
-    STATE.dispatch.raw.map(r => (r['Colour'] || '').toLowerCase().trim())
+    STATE.dispatch.raw.map(r => r._normColour)
   )].filter(Boolean).sort();
 
   colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
@@ -966,7 +969,20 @@ function buildDispatchChips() {
 
 function recomputeDispatch() {
   let groups = groupByOrder(STATE.dispatch.raw);
-  groups = applyDispatchFilters(groups);
+
+  // inline filter to use _normColour
+  const search = (STATE.dispatch.filters.search || '').toLowerCase();
+  const colour = STATE.dispatch.filters.colour;
+
+  groups = groups.filter(g => {
+    const text = g.rows.map(r =>
+      `${r['Order Number']} ${r['Item ID']} ${r['Colour']} ${r['Status']} ${r['User']}`
+    ).join(' ').toLowerCase();
+    const matchesSearch = !search || text.includes(search);
+    const matchesColour = (colour === null) || g.rows.some(r => r._normColour === colour);
+    return matchesSearch && matchesColour;
+  });
+
   STATE.dispatch.filteredGroups = groups;
   STATE.dispatch.pages = paginateGroups(groups, STATE.dispatch.pageSize);
   renderDispatch();
@@ -975,6 +991,7 @@ function recomputeDispatch() {
 function renderDispatch() {
   const body = document.getElementById('dispatchBody');
   body.innerHTML = '';
+
   const page = STATE.dispatch.pages[STATE.dispatch.pageIndex] || { rows: [] };
 
   if (!page.rows.length) {
@@ -983,11 +1000,11 @@ function renderDispatch() {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
       ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
-      .forEach(k => {
-        const td = document.createElement('td');
-        td.textContent = r[k] ?? '';
-        tr.appendChild(td);
-      });
+        .forEach(k => {
+          const td = document.createElement('td');
+          td.textContent = r[k] ?? '';
+          tr.appendChild(td);
+        });
       body.appendChild(tr);
     });
   }
@@ -1011,22 +1028,15 @@ function updateDispatchPager() {
   const totalPages = STATE.dispatch.pages.length;
   const currentPage = STATE.dispatch.pageIndex + 1;
 
-  if (pageNumEl) {
-    if (totalPages === 0) pageNumEl.textContent = '0 / 0';
-    else pageNumEl.textContent = `${currentPage} / ${totalPages}`;
-  }
-
+  if (pageNumEl) pageNumEl.textContent = totalPages ? `${currentPage} / ${totalPages}` : '0 / 0';
   if (prevBtn) prevBtn.disabled = (totalPages === 0 || currentPage <= 1);
   if (nextBtn) nextBtn.disabled = (totalPages === 0 || currentPage >= totalPages);
 
   const totalRows = STATE.dispatch.filteredGroups.reduce((sum,g) => sum + g.rows.length, 0);
   if (rowInfo) {
-    if (totalRows === 0) rowInfo.textContent = '0–0 of 0';
-    else {
-      const start = (STATE.dispatch.pageIndex * STATE.dispatch.pageSize) + 1;
-      const end = Math.min(start + STATE.dispatch.pageSize - 1, totalRows);
-      rowInfo.textContent = `${start}–${end} of ${totalRows}`;
-    }
+    rowInfo.textContent = totalRows
+      ? `${(STATE.dispatch.pageIndex * STATE.dispatch.pageSize) + 1}–${Math.min((STATE.dispatch.pageIndex * STATE.dispatch.pageSize) + STATE.dispatch.pageSize, totalRows)} of ${totalRows}`
+      : '0–0 of 0';
   }
 }
 
@@ -1260,6 +1270,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
