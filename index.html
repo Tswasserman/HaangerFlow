@@ -551,26 +551,54 @@ function loadStock() {
       setUploadStatus('Loaded');
     }).catch(err => { console.error(err); setUploadStatus('Failed'); });
 }
+      
 function buildStockChips() {
   const wrap = document.getElementById('colourChips');
   wrap.innerHTML = '';
-  const colours = [...new Set(STATE.stock.data.map(r => (r.Colour||'').toLowerCase().trim()))].filter(Boolean).sort();
-  const allChip = makeChip('All', STATE.stock.colourFilter === null, null, () => { STATE.stock.colourFilter = null; applyStockFilters(); renderStock(); });
-  wrap.appendChild(allChip);
+
+  // "All" chip
+  wrap.appendChild(makeChip('All', STATE.stock.colourFilter === null, null, () => {
+    STATE.stock.colourFilter = null;
+    applyStockFilters();
+    renderStock();
+  }));
+
+  // Colour chips (normalized to lowercase)
+  const colours = [...new Set(
+    STATE.stock.data.map(r => (r.Colour || '').toLowerCase().trim())
+  )].filter(Boolean).sort();
+
   colours.forEach(c => {
-    wrap.appendChild(makeChip(c, STATE.stock.colourFilter === c, c, () => { STATE.stock.colourFilter = c; applyStockFilters(); renderStock(); }));
+    wrap.appendChild(makeChip(c, STATE.stock.colourFilter === c, c, () => {
+      STATE.stock.colourFilter = c;
+      applyStockFilters();
+      renderStock();
+    }));
   });
 }
+
 function applyStockFilters() {
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const cf = STATE.stock.colourFilter;
   let out = STATE.stock.data;
+
   if (q) out = out.filter(r => r._searchKey.includes(q));
-  if (cf) out = out.filter(r => (r.Colour||'').toLowerCase().trim() === cf);
+
+  // only apply colour filter if cf is not null
+  if (cf !== null) {
+    out = out.filter(r => (r.Colour || '').toLowerCase().trim() === cf);
+  }
+
   const dir = STATE.stock.sortDir === 'asc' ? 1 : -1;
-  out.sort((a, b) => String(a[STATE.stock.sortKey]??'').localeCompare(String(b[STATE.stock.sortKey]??''), undefined, { numeric: true })*dir);
+  out.sort((a, b) =>
+    String(a[STATE.stock.sortKey] ?? '').localeCompare(
+      String(b[STATE.stock.sortKey] ?? ''), undefined, { numeric: true }
+    ) * dir
+  );
+
   STATE.stock.filtered = out;
 }
+
 function renderStock() {
   const body = document.getElementById('stockBody');
   body.innerHTML = '';
@@ -677,6 +705,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
