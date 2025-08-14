@@ -368,6 +368,37 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
 
     <script>
 
+// debounce
+window.debounce = window.debounce || function (fn, delay) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), delay);
+  };
+};
+
+// formatDate
+window.formatDate = window.formatDate || function (d) {
+  let dt = d instanceof Date ? d : new Date(d);
+  if (!(dt instanceof Date) || isNaN(dt)) return '';
+  return dt.toLocaleString('en-ZA', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
+
+
+
+function setupStockUI() {
+  const debouncedSearch = debounce(() => { /* ... */ }, 300);
+}
+
+
 (function () {
   const w = window;
 
@@ -718,6 +749,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
