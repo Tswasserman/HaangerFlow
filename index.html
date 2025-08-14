@@ -825,6 +825,21 @@ function updateStockPager() {
     }
   }
 }
+      // ---------- TOTALS HELPER ----------
+function updateStockTotals() {
+  const itemsEl   = document.getElementById('stockTotalItems');
+  const qtyEl     = document.getElementById('stockTotalQty');
+  const cartonsEl = document.getElementById('stockTotalCartons');
+
+  const rows = STATE.stock.filtered || [];
+  const totalItems   = rows.length;
+  const totalQty     = rows.reduce((sum, r) => sum + (parseFloat(r['Total QTY'])     || 0), 0);
+  const totalCartons = rows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
+
+  if (itemsEl)   itemsEl.textContent   = totalItems.toLocaleString('en-ZA');
+  if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
+  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
+}
 // ---------- RENDER ----------
 function renderStock() {
   // table
@@ -1245,6 +1260,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
