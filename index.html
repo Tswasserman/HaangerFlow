@@ -1054,6 +1054,15 @@ function updateDispatchTotals() {
 /**************
  * RECEIVING
  ***************/
+
+// Map visible labels (if ever needed) to backend dataset keys
+const DATASET_KEY_MAP = {
+  'Receiving Stock': 'receiving',
+  'Dispatched Orders': 'dispatch',
+  'Stock': 'stock',
+  'Recycled Stock': 'recycled'
+};
+
 function setupReceivingUI() {
   const searchEl = document.getElementById('receivingSearch');
   const prevBtn  = document.getElementById('receivingPrev');
@@ -1079,8 +1088,11 @@ function setupReceivingUI() {
   });
 }
 
-function loadReceiving() {
-  fetch(`${API.baseUrl}?dataset=receiving&sheetName=${encodeURIComponent('Receiving Reports')}`)
+function loadReceiving(labelOverride) {
+  // Pick dataset key — if a label is passed in, map it; else default to 'receiving'
+  const datasetKey = DATASET_KEY_MAP[labelOverride] || 'receiving';
+
+  fetch(`${API.baseUrl}?dataset=${encodeURIComponent(datasetKey)}&sheetName=${encodeURIComponent('Receiving Reports')}`)
     .then(res => res.json())
     .then(payload => {
       STATE.receiving.raw = (payload.rows || []).map(r => {
@@ -1108,9 +1120,8 @@ function buildReceivingChips() {
   if (!wrap) return;
   wrap.innerHTML = '';
 
-  // ensure filters object exists
   if (!STATE.receiving.filters) STATE.receiving.filters = { colour: null, search: '' };
-  const current = STATE.receiving.filters.colour; // normalized lowercase or null
+  const current = STATE.receiving.filters.colour;
 
   const makeActiveChip = (label, value) => {
     const isActive = current === value;
@@ -1118,16 +1129,14 @@ function buildReceivingChips() {
       STATE.receiving.filters.colour = value;
       STATE.receiving.pageIndex = 0;
       recomputeReceiving();
-      buildReceivingChips(); // re-apply active state
+      buildReceivingChips();
     });
     if (isActive) chip.classList.add('active');
     return chip;
   };
 
-  // All
   wrap.appendChild(makeActiveChip('All', null));
 
-  // colours (normalized to lowercase)
   const colours = [...new Set(
     STATE.receiving.raw.map(r => (r['Colour'] || '').toLowerCase().trim())
   )].filter(Boolean).sort();
@@ -1137,7 +1146,7 @@ function buildReceivingChips() {
 
 function applyReceivingFilters(groups) {
   const s = (STATE.receiving.filters.search || '').toLowerCase();
-  const c = STATE.receiving.filters.colour; // null or lowercase
+  const c = STATE.receiving.filters.colour;
 
   let out = groups;
 
@@ -1160,7 +1169,6 @@ function applyReceivingFilters(groups) {
     })).filter(g => g.rows.length);
   }
 
-  // sort groups by timestamp desc (most recent first), stable
   out.sort((a,b) => {
     const at = a.rows.length ? new Date(a.rows[0].timestampIso || a.rows[0]['Timestamp']).getTime() : 0;
     const bt = b.rows.length ? new Date(b.rows[0].timestampIso || b.rows[0]['Timestamp']).getTime() : 0;
@@ -1171,10 +1179,10 @@ function applyReceivingFilters(groups) {
 }
 
 function recomputeReceiving() {
-  let groups = groupByOrder(STATE.receiving.raw);     // reuse your existing helper
+  let groups = groupByOrder(STATE.receiving.raw);
   groups = applyReceivingFilters(groups);
   STATE.receiving.filteredGroups = groups;
-  STATE.receiving.pages = paginateGroups(groups, STATE.receiving.pageSize); // reuse your helper
+  STATE.receiving.pages = paginateGroups(groups, STATE.receiving.pageSize);
   renderReceiving();
 }
 
@@ -1245,9 +1253,7 @@ function updateReceivingTotals() {
   const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
 
   if (countEl)   countEl.textContent   = orders.toLocaleString('en-ZA');
-  if (qtyEl)     qtyEl.textContent     = totalQty.toLocaleString('en-ZA');
-  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
-}
+  if (qtyEl)     qtyEl.textContent    
 
     </script>
  <footer class="app-footer">
@@ -1259,6 +1265,7 @@ function updateReceivingTotals() {
 
   </body>
 </html>
+
 
 
 
