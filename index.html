@@ -609,29 +609,28 @@ function buildStockChips() {
   const wrap = document.getElementById('colourChips');
   wrap.innerHTML = '';
 
-  // "All"
-  wrap.appendChild(
-    makeChip('All', STATE.stock.colourFilter === null, null, () => {
-      STATE.stock.colourFilter = null;
+  const makeActiveChip = (label, value) => {
+    const isActive = STATE.stock.colourFilter === value;
+    const chip = makeChip(label, isActive, value, () => {
+      STATE.stock.colourFilter = value;
       STATE.stock.page = 1;
       computeStockDerived();
       renderStock();
-    })
-  );
+      buildStockChips(); // <- rebuild so .active is reapplied
+    });
+    if (isActive) chip.classList.add('active');
+    return chip;
+  };
+
+  // "All"
+  wrap.appendChild(makeActiveChip('All', null));
 
   // colours
   const colours = [...new Set(
     STATE.stock.data.map(r => (r.Colour || '').toLowerCase().trim())
   )].filter(Boolean).sort();
 
-  colours.forEach(c => {
-    wrap.appendChild(makeChip(c, STATE.stock.colourFilter === c, c, () => {
-      STATE.stock.colourFilter = c;
-      STATE.stock.page = 1;
-      computeStockDerived();
-      renderStock();
-    }));
-  });
+  colours.forEach(c => wrap.appendChild(makeActiveChip(c, c)));
 }
 
 // ---------- DERIVATION (filter + sort + pagination math) ----------
@@ -871,6 +870,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
