@@ -557,12 +557,13 @@ function buildStockChips() {
   wrap.innerHTML = '';
 
   // "All" chip
-  wrap.appendChild(makeChip('All', STATE.stock.colourFilter === null, null, () => {
-    STATE.stock.colourFilter = null;
+wrap.appendChild(
+  makeChip('All', STATE.stock.colourFilter === null, null, () => {
+    STATE.stock.colourFilter = null; // true reset
     applyStockFilters();
     renderStock();
-  }));
-
+  })
+);
   // Colour chips (normalized to lowercase)
   const colours = [...new Set(
     STATE.stock.data.map(r => (r.Colour || '').toLowerCase().trim())
@@ -585,9 +586,12 @@ function applyStockFilters() {
   if (q) out = out.filter(r => r._searchKey.includes(q));
 
   // only apply colour filter if cf is not null
-  if (cf !== null) {
-    out = out.filter(r => (r.Colour || '').toLowerCase().trim() === cf);
-  }
+ // only apply colour filter if cf is NOT null
+if (cf !== null) {
+  out = out.filter(
+    r => (r.Colour || '').toLowerCase().trim() === cf
+  );
+}
 
   const dir = STATE.stock.sortDir === 'asc' ? 1 : -1;
   out.sort((a, b) =>
@@ -705,6 +709,7 @@ function loadReceiving() {
 
   </body>
 </html>
+
 
 
 
