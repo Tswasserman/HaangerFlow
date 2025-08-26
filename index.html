@@ -18,6 +18,25 @@
   --table-row: #0e141b;
   --table-row-alt: #121a23;
 }
+.table-header {
+  background: #0d141c; 
+  color: var(--ink);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  gap: 50px;
+}
+.table-header .sep {
+  color: var(--muted);
+  margin: 0 8px;
+}
+
 
 html, body {
   margin: 0;
@@ -340,12 +359,36 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
               <input type="text" id="dispatchSearch" placeholder="Search Order Number, Colour, or Status…">
             </div>
           </div>
-
+<div id="uploadStatus" class="upload-status">Waiting…</div>
+    <div id="lastUpload" class="last-upload">Last update: –</div>
           <div class="kpi">
             <div class="pill">Orders<strong id="dispatchCount">0</strong></div>
             <div class="pill">Total Qty<strong id="dispatchQty">0</strong></div>
             <div class="pill">Total Cartons<strong id="dispatchCartons">0</strong></div>
           </div>
+
+      <div class="table-wrap">
+  <table id="dispatchTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Order Number</th>
+        <th>PH Code</th>
+        <th>Qty Per Carton</th>
+        <th>Colour</th>
+        <th>Total Per Carton</th>
+        <th>Total Cartons</th>
+        <th>Total Qty</th>
+        <th>Status</th>
+        <th>User</th>
+       
+      </tr>
+    </thead>
+    <tbody id="dispatchBody"></tbody>
+  </table>
+</div>
+
+
 
           <div class="table-wrap">
             <table id="dispatchTable">
@@ -387,7 +430,22 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
 
     <div class="table-wrap">
       <table id="receivingTable">
-        <thead><tr id="receivingHeadRow"></tr></thead>
+        <thead>
+  <tr>
+  <th>Timestamp</th>
+    <th></th>
+    <th>Hanger ID</th>
+    <th>Colour</th>
+    <th>Qty Per Carton</th>
+    <th>Total Cartons</th>
+    <th>Total Qty</th>
+    <th>Status</th>
+    <th>User</th>
+
+
+  </tr>
+</thead>
+
         <tbody id="receivingBody"></tbody>
       </table>
     </div>
@@ -540,7 +598,7 @@ window.paginateGroups = window.paginateGroups || function (groups, pageSize) {
 };
 
 const API = {
-  baseUrl: 'https://script.google.com/macros/s/AKfycbzCF7yUZiprbPZtqCIRj6cy5iXaFYxs2iR22fArEFkIRG8Xq38DHcpzIz232OiKOPrdwg/exec',
+  baseUrl: 'https://script.google.com/macros/s/AKfycbwKqo89S5pzIDr4Ee0YwdtWWBRxUSjnoyiZkUw1yPuI8_ZPQx1BApjatoAzNqTxSY2zmQ/exec',
   resource: 'stock',
   useJsonpFallback: true
 };
@@ -553,7 +611,7 @@ const STATE = {
     data: [], filtered: [],
     sortKey: 'Colour', sortDir: 'asc',
     page: 1, pageSize: 50, colourFilter: null,
-    columns: ['timestamp','Item','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code']
+    columns: ['timestamp','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code']
   },
   dispatch: {
     raw: [], groups: [], filteredGroups: [], pages: [],
@@ -610,12 +668,11 @@ function switchPage(route) {
 STATE.stock = {
   data: [],
   filtered: [],
-  columns: ['timestamp','Item','Colour','QTY Per Carton','Total Cartons','Total QTY','PH Code'],
+  columns: ['timestamp','PH Code','Colour','QTY Per Carton','Total Cartons','Total QTY',],
 
   // filters/sort
   colourFilter: null,
   sortKey: 'PH Code',
-  sortKey: 'Item', 
   sortDir: 'asc',
 
   // paging
@@ -678,15 +735,13 @@ function loadStock() {
     .then(payload => {
       STATE.stock.data = (payload.rows || []).map(r => ({
         timestamp: r.timestampIso || r.timestamp || '',
-        Item: r['Item'] || '', 
+        'PH Code': r['PH Code'],
         Colour: r['Colour'],
         'QTY Per Carton': r['QTY Per Carton'],
         'Total Cartons': r['Total Cartons'],
         'Total QTY': r['Total QTY'],
-        'PH Code': r['PH Code'],
-        _searchKey: `${r['Item'] || ''} ${r['Colour'] || ''} ${r['PH Code'] || ''}`.toLowerCase()
+        _searchKey: `${r['Colour'] || ''} ${r['PH Code'] || ''}`.toLowerCase()
       }));
-
 
       buildStockChips();
       computeStockDerived();
@@ -916,28 +971,31 @@ function loadDispatch() {
   fetch(`${API.baseUrl}?dataset=dispatch`)
     .then(res => res.json())
     .then(payload => {
-      STATE.dispatch.raw = (payload.rows||[]).map(r => {
+      STATE.dispatch.raw = (payload.rows || []).map(r => {
         const iso = r.timestampIso || r['Timestamp'] || '';
         const d = new Date(iso);
         return {
           ...r,
-          // numeric normalisation
           'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
           'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
-          // date + ID
           _ts: isNaN(d) ? new Date(0) : d,
           _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
           _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`,
-          // colour normalisation for filters/chips
           _normColour: (r['Colour'] || '').toLowerCase().trim()
         };
       });
+
       buildDispatchChips();
+
+      // ✅ Always render the default "All" view on load
+      STATE.dispatch.filters.search = '';
+      STATE.dispatch.pageIndex = 0;
       recomputeDispatch();
     })
     .catch(console.error);
 }
+
 
 function buildDispatchChips() {
   const wrap = document.getElementById('dispatchChips');
@@ -1021,7 +1079,7 @@ function renderDispatchFlat() {
   } else {
     rows.slice(start, end).forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1033,6 +1091,7 @@ function renderDispatchFlat() {
 
   updateDispatchPagerFlat();
   updateDispatchTotalsFlat();
+ 
 }
 
 function renderDispatchGrouped() {
@@ -1046,7 +1105,7 @@ function renderDispatchGrouped() {
   } else {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1057,39 +1116,41 @@ function renderDispatchGrouped() {
   }
 
   updateDispatchPagerGrouped();
-  updateDispatchTotalsGrouped();
+  updateDispatchTotals();
+
 }
 function recomputeDispatch() {
   const search = (STATE.dispatch.filters.search || '').toLowerCase();
   const colour = STATE.dispatch.filters.colour;
 
-  // --- CASE 1: Search active -> group by Order Number ---
   if (search) {
     let rows = STATE.dispatch.raw;
-    // Filter rows to the search term
     rows = rows.filter(r =>
       String(r['Order Number'] || '').toLowerCase().includes(search)
     );
-    // Still allow colour filter on top if active
     if (colour !== null) rows = rows.filter(r => r._normColour === colour);
 
     const groups = groupByOrder(rows);
     STATE.dispatch.filteredGroups = groups;
     STATE.dispatch.pages = paginateGroups(groups, STATE.dispatch.pageSize);
-    STATE.dispatch.pageIndex = Math.min(STATE.dispatch.pageIndex, STATE.dispatch.pages.length - 1);
+
+    STATE.dispatch.pageIndex = 0; // reset to first page
     renderDispatchGrouped();
+    updateDispatchTotals();
     return;
   }
 
-  // --- CASE 2: No search -> flat list filter by colour only ---
+  // No search → flat mode
   let out = STATE.dispatch.raw;
   if (colour !== null) out = out.filter(r => r._normColour === colour);
 
   STATE.dispatch.filteredRows = out;
   STATE.dispatch.totalPages = Math.ceil(out.length / STATE.dispatch.pageSize);
-  STATE.dispatch.pageIndex = Math.min(STATE.dispatch.pageIndex, STATE.dispatch.totalPages - 1);
+  STATE.dispatch.pageIndex = 0; // reset to first page
   renderDispatchFlat();
+  updateDispatchTotalsFlat();
 }
+
 
 function renderDispatch() {
   const body = document.getElementById('dispatchBody');
@@ -1102,7 +1163,7 @@ function renderDispatch() {
   } else {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1117,10 +1178,20 @@ function renderDispatch() {
 }
 
 function goDispatchPage(n) {
-  const totalPages = STATE.dispatch.pages.length;
-  STATE.dispatch.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
-  renderDispatch();
+  if (STATE.dispatch.filters.search) {
+    // grouped mode
+    const totalPages = STATE.dispatch.pages.length;
+    STATE.dispatch.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
+    renderDispatchGrouped();
+  } else {
+    // flat mode
+    const totalPages = STATE.dispatch.totalPages;
+    STATE.dispatch.pageIndex = Math.min(Math.max(n, 0), totalPages - 1);
+    renderDispatchFlat();
+  }
 }
+
+
 
 function updateDispatchPager() {
   const pageNumEl = document.getElementById('dispatchPageNum');
@@ -1148,15 +1219,31 @@ function updateDispatchTotals() {
   const qtyEl = document.getElementById('dispatchQty');
   const cartonsEl = document.getElementById('dispatchCartons');
 
-  const allRows = STATE.dispatch.filteredGroups.flatMap(g => g.rows);
-  const totalOrders = STATE.dispatch.filteredGroups.length;
-  const totalQty = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Qty']) || 0), 0);
-  const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
+  // If grouped mode (search active)
+  if (STATE.dispatch.filteredGroups) {
+    const allRows = STATE.dispatch.filteredGroups.flatMap(g => g.rows);
+    const totalOrders = STATE.dispatch.filteredGroups.length;
+    const totalQty = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Qty']) || 0), 0);
+    const totalCartons = allRows.reduce((sum, r) => sum + (parseFloat(r['Total Cartons']) || 0), 0);
 
-  if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
-  if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
-  if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
+    if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
+    if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
+    if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
+    return;
+  }
+
+  // If flat mode (no search)
+  if (STATE.dispatch.filteredRows) {
+    const totalOrders = STATE.dispatch.filteredRows.length;
+    const totalQty = STATE.dispatch.filteredRows.reduce((sum, r) => sum + (r['Total Qty'] || 0), 0);
+    const totalCartons = STATE.dispatch.filteredRows.reduce((sum, r) => sum + (r['Total Cartons'] || 0), 0);
+
+    if (countEl) countEl.textContent = totalOrders.toLocaleString('en-ZA');
+    if (qtyEl) qtyEl.textContent = totalQty.toLocaleString('en-ZA');
+    if (cartonsEl) cartonsEl.textContent = totalCartons.toLocaleString('en-ZA');
+  }
 }
+
 
 /**************
  * RECEIVING
