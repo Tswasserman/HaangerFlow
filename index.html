@@ -276,6 +276,20 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
     text-align: center;
   }
 }
+/* Light mode overrides */
+.light-mode {
+  --bg: #f5f7fa;
+  --panel: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #555;
+  --accent: #0066cc;
+  --accent-2: #2e8b57;
+  --danger: #cc0000;
+  --border: #d0d7de;
+  --chip: #e6e9ef;
+  --table-row: #ffffff;
+  --table-row-alt: #f0f2f5;
+}
 
 
     </style>
@@ -286,6 +300,8 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
     <button class="nav-btn" data-route="dispatch">Dispatched Orders</button>
     <button class="nav-btn" data-route="receiving">Receiving Stock</button>
     <button class="nav-btn" data-route="recycled">Recycled Stock</button>
+    <button id="mode-toggle">🌙 Dark / ☀️ Light</button>
+
 
   </div>
 
@@ -373,10 +389,10 @@ tbody tr:nth-child(even) { background: var(--table-row-alt); }
       <tr>
         <th>Timestamp</th>
         <th>Order Number</th>
+        <th>Customer Name</th>
         <th>PH Code</th>
-        <th>Qty Per Carton</th>
         <th>Colour</th>
-        <th>Total Per Carton</th>
+        <th>Qty Per Carton</th>
         <th>Total Cartons</th>
         <th>Total Qty</th>
         <th>Status</th>
@@ -971,20 +987,30 @@ function loadDispatch() {
   fetch(`${API.baseUrl}?dataset=dispatch`)
     .then(res => res.json())
     .then(payload => {
-      STATE.dispatch.raw = (payload.rows || []).map(r => {
-        const iso = r.timestampIso || r['Timestamp'] || '';
-        const d = new Date(iso);
-        return {
-          ...r,
-          'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
-          'Total Cartons':  parseFloat(String(r['Total Cartons']  ?? '').replace(/[^\d.-]/g,'')) || 0,
-          'Total Qty':      parseFloat(String(r['Total Qty']      ?? '').replace(/[^\d.-]/g,'')) || 0,
-          _ts: isNaN(d) ? new Date(0) : d,
-          _tsDisplay: isNaN(d) ? String(r['Timestamp']||'') : formatDate(d),
-          _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`,
-          _normColour: (r['Colour'] || '').toLowerCase().trim()
-        };
-      });
+STATE.dispatch.raw = (payload.rows || []).map(r => {
+  const iso = r.timestampIso || r['Timestamp'] || '';
+  const d = new Date(iso);
+
+  return {
+    '_tsDisplay': isNaN(d) ? String(r['Timestamp'] || '') : formatDate(d),
+    'Order Number': r['Order Number'] || '',
+    'Customer Name': r['Customer Name'] || '',
+    'Item ID': r['Item ID'] || '',
+    'QRIDs': r['QRIDs'] || '',
+    'Qty Per Carton': parseFloat(String(r['Qty Per Carton'] ?? '').replace(/[^\d.-]/g,'')) || 0,
+    'Colour': r['Colour'] || '',
+    'Total Cartons': parseFloat(String(r['Total Cartons'] ?? '').replace(/[^\d.-]/g,'')) || 0,
+    'Total Qty': parseFloat(String(r['Total Qty'] ?? '').replace(/[^\d.-]/g,'')) || 0,
+    'Status': r['Status'] || '',
+    'User': r['User'] || '',
+    'PH Code': r['PH Code'] || '',
+    _ts: isNaN(d) ? new Date(0) : d,
+    _rowUid: `${String(r['Order Number']||'').trim()}::${String(r['Item ID']||'').trim()}::${iso}`,
+    _normColour: (r['Colour'] || '').toLowerCase().trim()
+  };
+});
+
+
 
       buildDispatchChips();
 
@@ -1079,7 +1105,16 @@ function renderDispatchFlat() {
   } else {
     rows.slice(start, end).forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+      ['_tsDisplay',
+      'Order Number',
+      'Customer Name',
+      'PH Code',
+      'Colour',
+      'Qty Per Carton',
+      'Total Cartons',
+      'Total Qty',
+      'Status',
+      'User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1105,7 +1140,16 @@ function renderDispatchGrouped() {
   } else {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+         ['_tsDisplay',
+      'Order Number',
+      'Customer Name',
+      'PH Code',
+      'Colour',
+      'Qty Per Carton',
+      'Total Cartons',
+      'Total Qty',
+      'Status',
+      'User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1163,7 +1207,16 @@ function renderDispatch() {
   } else {
     page.rows.forEach(r => {
       const tr = document.createElement('tr');
-      ['_tsDisplay','Order Number','Item ID','PH Code','Colour','Qty Per Carton','Total Cartons','Total Qty','Status','User']
+         ['_tsDisplay',
+      'Order Number',
+      'Customer Name',
+      'PH Code',
+      'Colour',
+      'Qty Per Carton',
+      'Total Cartons',
+      'Total Qty',
+      'Status',
+      'User']
         .forEach(k => {
           const td = document.createElement('td');
           td.textContent = r[k] ?? '';
@@ -1457,35 +1510,27 @@ function updateReceivingTotals() {
     <span>Premierhangers (PTY) LTD </span>
   </div>
 </footer>
+<script>
+  const toggleBtn = document.getElementById('mode-toggle');
+  const body = document.body;
+
+  // Load saved theme
+  if (localStorage.getItem('theme') === 'light') {
+    body.classList.add('light-mode');
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    body.classList.toggle('light-mode');
+    if (body.classList.contains('light-mode')) {
+      localStorage.setItem('theme', 'light');
+    } else {
+      localStorage.setItem('theme', 'dark');
+    }
+  });
+</script>
 
   </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
